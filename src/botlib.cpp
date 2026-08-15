@@ -3524,8 +3524,9 @@ void Bot::spawned () {
       clearTasks ();
 
       m_buyingFinished = true;
-      if (game.is (GameFlags::CSDM | GameFlags::ZombieMod | GameFlags::HalfLife)) {
+      if (game.is (GameFlags::HalfLife)) {
          m_botMovement = true; // force bot movement to be on
+      }
    }
 }
 
