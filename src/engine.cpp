@@ -859,7 +859,7 @@ void Game::constructCSBinaryName (StringArray &libs) {
    }
    // else: suffix remains empty (e.g., x86 linux/windows/macos)
 
-   const bool isHalfLifeMod = getRunningModName () == "valve" || is (GameFlags::HalfLife);
+   const bool isHalfLifeMod = StringRef(getRunningModName()) == "valve" || is(GameFlags::HalfLife);
 
    // build base names
    if (plat.android) {
@@ -1111,7 +1111,7 @@ bool Game::postload () {
    }
 
    // detect half-life by gamedir early (metamod may not open hl.dll itself)
-   if (getRunningModName () == "valve") {
+   if (StringRef(getRunningModName()) == "valve") {
       m_gameFlags |= GameFlags::HalfLife;
       m_gameFlags &= ~(GameFlags::Modern | GameFlags::Legacy | GameFlags::ConditionZero | GameFlags::HasBotVoice);
    }
