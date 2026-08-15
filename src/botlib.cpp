@@ -3211,6 +3211,14 @@ void Bot::update () {
 
       m_botMovement = true;
    }
+   else if (m_buyingFinished
+      && !(pev->maxspeed < 10.0f && tid != Task::PlantBomb && tid != Task::DefuseBomb)
+      && !cv_freeze_bots
+      && !graph.hasChanged ()
+      || (game.is (GameFlags::HalfLife) && !cv_freeze_bots && !pev->maxspeed < 10.0f)) {
+
+      m_botMovement = true;
+   }
    checkMsgQueue ();
 
    if (!m_isStale && m_botMovement) {
