@@ -3519,7 +3519,7 @@ void Bot::logic () {
 }
 
 void Bot::spawned () {
-   if (game.is (GameFlags::CSDM | GameFlags::ZombieMod)) {
+   if (game.is (GameFlags::CSDM | GameFlags::ZombieMod | GameFlags::HalfLife)) {
       newRound ();
       clearTasks ();
 
