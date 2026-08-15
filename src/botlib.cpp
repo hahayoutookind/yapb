@@ -425,6 +425,10 @@ void Bot::updatePickups () {
    m_pickupItem = nullptr;
    m_pickupType = Pickup::None;
 
+   edict_t *chargerCandidate = nullptr;
+   Vector chargerPos = nullptr;
+   bool foundPriorityPickup = false;
+
    for (const auto &ent : interesting) {
       bool allowPickup = false; // assume can't use it until known otherwise
 
@@ -462,19 +466,22 @@ void Bot::updatePickups () {
          else if (game.is (GameFlags::HalfLife)
             && (classname.startsWith ("weapon_") || classname.startsWith ("ammo_")
                || classname.startsWith ("item_healthkit") || classname.startsWith ("item_battery")
-               || isWeaponBox)
+               || classname.startsWith ("item_longjump") || isWeaponBox)
             && !m_isUsingGrenade) {
 
             allowPickup = true;
 
             if (classname.startsWith ("item_healthkit") || classname.startsWith ("item_battery")
-               || classname.startsWith ("ammo_")) {
+               || classname.startsWith ("ammo_") || classname.startsWith ("item_longjump")) {
                pickupType = Pickup::AmmoAndKits;
 
                if (classname.startsWith ("item_healthkit") && m_healthValue >= 100.0f) {
                   allowPickup = false;
                }
                else if (classname.startsWith ("item_battery") && pev->armorvalue >= 100.0f) {
+                  allowPickup = false;
+               }
+               else if (classname.startsWith ("item_longjump") && m_hasLongJump) {
                   allowPickup = false;
                }
             }
@@ -489,6 +496,21 @@ void Bot::updatePickups () {
                         break;
                      }
                   }
+               }
+            }
+         }
+         else if (game.is (GameFlags::HalfLife)
+            && (classname == "func_recharge" || classname == "func_healthcharger")
+            && !m_isUsingGrenade) {
+
+            // empty charger (juice depleted sets frame to 1)
+            if (ent->v.frame < 1.0f) {
+               const bool needArmor = classname == "func_recharge" && pev->armorvalue < 100.0f;
+               const bool needHealth = classname == "func_healthcharger" && m_healthValue < pev->max_health;
+
+               if (needArmor || needHealth) {
+                  chargerCandidate = ent;
+                  chargerPos = origin;
                }
             }
          }
@@ -798,6 +820,7 @@ void Bot::updatePickups () {
             pickupItem = ent; // remember this entity
 
             m_pickupType = pickupType;
+            foundPriorityPickup = (pickupType != Pickup::Charger);
             break;
          }
          else {
@@ -805,6 +828,13 @@ void Bot::updatePickups () {
          }
       }
    } // end of the while loop
+
+   // wall chargers only when nothing else (ammo_/item_/weapons) to do
+   if (!foundPriorityPickup && !game.isNullEntity (chargerCandidate)) {
+      pickupItem = chargerCandidate;
+      pickupPos = chargerPos;
+      m_pickupType = Pickup::Charger;
+   }
 
    if (!game.isNullEntity (pickupItem)) {
       for (const auto &other : bots) {
@@ -815,7 +845,9 @@ void Bot::updatePickups () {
             return;
          }
       }
-      const float highOffset = (m_pickupType == Pickup::Hostage || m_pickupType == Pickup::PlantedC4) ? 50.0f : 20.0f;
+      const float highOffset = (m_pickupType == Pickup::Hostage || m_pickupType == Pickup::PlantedC4)
+         ? 50.0f
+         : (m_pickupType == Pickup::Charger ? 80.0f : 20.0f);
 
       // check if item is too high to reach, check if getting the item would hurt bot
       if (pickupPos.z > getEyesPos ().z + highOffset || isDeadlyMove (pickupPos)) {
@@ -2094,8 +2126,8 @@ void Bot::filterTasks () {
    if (!game.isNullEntity (m_pickupItem) && getCurrentTaskId () != Task::EscapeFromBomb) {
       m_states |= Sense::PickupItem;
 
-      if (m_pickupType == Pickup::Button) {
-         filter[Task::PickupItem].desire = 50.0f; // always pickup button
+      if (m_pickupType == Pickup::Button || m_pickupType == Pickup::Charger) {
+         filter[Task::PickupItem].desire = 50.0f; // always pickup button / charger
       }
       else {
          filter[Task::PickupItem].desire = cr::max (50.0f, 500.0f - pev->origin.distance (game.getEntityOrigin (m_pickupItem)) * 0.2f);
@@ -2465,7 +2497,18 @@ bool Bot::lastEnemyShootable () {
       || game.isNullEntity (m_lastEnemy)) {
       return false;
    }
-   return util.getConeDeviation (ent (), m_lastEnemyOrigin) >= 0.90f && isPenetrableObstacle (m_lastEnemyOrigin);
+   if (util.getConeDeviation (ent (), m_lastEnemyOrigin) < 0.90f) {
+      return false;
+   }
+
+   // half-life gauss can charge secondary through walls when hearing / suspecting
+   if (game.is (GameFlags::HalfLife)
+      && (pev->weapons & cr::bit (HLWeapon::Gauss))
+      && getAmmo (HLWeapon::Gauss) > 5
+      && (m_states & (Sense::HearingEnemy | Sense::SuspectEnemy))) {
+      return true;
+   }
+   return isPenetrableObstacle (m_lastEnemyOrigin);
 }
 
 void Bot::handleChatterTaskChange (Task tid) {
@@ -3514,6 +3557,12 @@ void Bot::logic () {
    // check if need to use parachute
    checkParachute ();
 
+   // half-life longjump: duck then jump while walking on ground
+   if (game.is (GameFlags::HalfLife)) {
+      refreshHLLongJumpState ();
+      tryHLLongJump ();
+   }
+
    // display some debugging thingy to host entity
    if (cv_debug.as <int> () >= 1) {
       showDebugOverlay ();
@@ -3522,6 +3571,42 @@ void Bot::logic () {
    // save the previous speed (for checking if stuck)
    m_prevSpeed = cr::abs (m_moveSpeed);
    m_lastDamageType = -1; // reset damage
+}
+
+void Bot::refreshHLLongJumpState () {
+   if (!game.is (GameFlags::HalfLife)) {
+      m_hasLongJump = false;
+      return;
+   }
+
+   const char *slj = engfuncs.pfnGetPhysicsKeyValue (ent (), "slj");
+   m_hasLongJump = (slj != nullptr && slj[0] == '1');
+}
+
+void Bot::tryHLLongJump () {
+   if (!m_hasLongJump
+      || !isOnFloor ()
+      || isOnLadder ()
+      || isInWater ()
+      || m_moveSpeed < pev->maxspeed * 0.35f
+      || m_hlLongJumpTime > game.time ()
+      || (pev->button & IN_JUMP)
+      || getCurrentTaskId () == Task::Camp) {
+      m_hlLongJumpState = 0;
+      return;
+   }
+
+   // duck first so flDuckTime is active, then jump next frame
+   if (m_hlLongJumpState == 0) {
+      pev->button |= IN_DUCK;
+      m_hlLongJumpState = 1;
+      return;
+   }
+
+   pev->button |= (IN_DUCK | IN_JUMP);
+   m_hlLongJumpState = 0;
+   m_hlLongJumpTime = game.time () + 1.25f;
+   m_jumpTime = game.time ();
 }
 
 void Bot::spawned () {

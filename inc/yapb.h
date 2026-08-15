@@ -533,6 +533,10 @@ private:
    void handleWeapons (float distance, int index, int id, int choosen);
    void handleHLWeapons (float distance, int id, int choosen);
    bool handleHLSpecialWeapon (float distance, int id);
+   bool updateHLMp5GrenadeAim ();
+   void tryHLLongJump ();
+   void refreshHLLongJumpState ();
+   int selectHLCombatWeapon (float distance) const;
    void focusEnemy ();
    void selectBestWeapon ();
    void selectSecondary ();
@@ -693,12 +697,16 @@ public:
    int m_ammo[MAX_AMMO_SLOTS] {}; // total ammo amounts
    int m_deathCount {}; // number of bot deaths
    int m_hlSatchelState {}; // 0 = place, 1 = detonate (hl satchel)
+   int m_hlLongJumpState {}; // 0 = idle, 1 = ducked, about to jump
 
    float m_hlGaussChargeTime {}; // when gauss charge started (0 = not charging)
    float m_hlGrenadeCookTime {}; // when handgrenade pin was pulled (0 = idle)
    float m_hlRpgSpotCheck {}; // next time to toggle rpg laser
+   float m_hlLongJumpTime {}; // next allowed longjump attempt
 
    bool m_hlRpgSpotActive {}; // rpg laser spot enabled
+   bool m_hlWantMp5Grenade {}; // aiming mp5 grenade like a cs throw
+   bool m_hasLongJump {}; // half-life longjump module equipped
    bool m_isVIP {}; // bot is vip?
    bool m_isAlive {}; // has the player been killed or has he just respawned
    bool m_notStarted {}; // team/class not chosen yet

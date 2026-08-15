@@ -357,7 +357,8 @@ CR_DECLARE_SCOPED_ENUM (Pickup,
    Shield,
    DefusalKit,
    Items,
-   AmmoAndKits
+   AmmoAndKits,
+   Charger
 )
 
 // fight style type

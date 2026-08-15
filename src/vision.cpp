@@ -363,6 +363,11 @@ bool Frustum::check (const Planes &planes, edict_t *ent) const {
 }
 
 void Bot::setAimDirection () {
+   // half-life mp5 grenades use the same look math as cs grenades
+   if (game.is (GameFlags::HalfLife)) {
+      updateHLMp5GrenadeAim ();
+   }
+
    uint32_t flags = m_aimFlags;
 
    // don't allow bot to look at danger positions under certain circumstances

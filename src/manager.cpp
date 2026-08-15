@@ -1648,6 +1648,16 @@ void Bot::newRound () {
    m_bombSearchOverridden = false;
    m_fireHurtsFriend = false;
 
+   m_hlGaussChargeTime = 0.0f;
+   m_hlGrenadeCookTime = 0.0f;
+   m_hlRpgSpotCheck = 0.0f;
+   m_hlRpgSpotActive = false;
+   m_hlWantMp5Grenade = false;
+   m_hlSatchelState = 0;
+   m_hlLongJumpState = 0;
+   m_hlLongJumpTime = 0.0f;
+   m_hasLongJump = false;
+
    m_blindButton = 0;
    m_blindTime = 0.0f;
    m_jumpTime = 0.0f;

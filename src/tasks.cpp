@@ -1741,43 +1741,85 @@ void Bot::pickupItem_ () {
       }
       break;
 
-   case Pickup::Button:
+   case Pickup::Button: {
       m_aimFlags |= AimFlags::Entity;
 
       if (game.isNullEntity (m_pickupItem)) {
          completeTask ();
          m_pickupType = Pickup::None;
+      }
+      else {
+         float distanceToButtonSq = cr::sqrf (90.0f);
 
+         // reduce on lifts
+         if (!game.isNullEntity (m_liftEntity)) {
+            distanceToButtonSq = cr::sqrf (24.0f);
+         }
+
+         // near to the button?
+         if (itemDistanceSq < distanceToButtonSq) {
+            m_moveSpeed = 0.0f;
+            m_strafeSpeed = 0.0f;
+            m_moveToGoal = false;
+            m_checkTerrain = false;
+
+            // find angles from bot origin to entity...
+            const float angleToEntity = isInFOV (dest - getEyesPos ());
+
+            // facing it directly?
+            if (angleToEntity <= 10.0f) {
+               MDLL_Use (m_pickupItem, ent ());
+
+               m_pickupItem = nullptr;
+               m_pickupType = Pickup::None;
+               m_buttonPushTime = game.time () + 3.0f;
+
+               completeTask ();
+            }
+         }
+      }
+      break;
+   }
+
+   case Pickup::Charger: {
+      m_aimFlags |= AimFlags::Entity;
+
+      if (game.isNullEntity (m_pickupItem)) {
+         completeTask ();
+         m_pickupType = Pickup::None;
          break;
       }
-      float distanceToButtonSq = cr::sqrf (90.0f);
 
-      // reduce on lifts
-      if (!game.isNullEntity (m_liftEntity)) {
-         distanceToButtonSq = cr::sqrf (24.0f);
+      const auto chargerClass = m_pickupItem->v.classname.str ();
+      const bool isArmorCharger = chargerClass == "func_recharge";
+      const bool isHealthCharger = chargerClass == "func_healthcharger";
+
+      // no juice left, or already topped up
+      if (m_pickupItem->v.frame >= 1.0f
+         || (isArmorCharger && pev->armorvalue >= 100.0f)
+         || (isHealthCharger && m_healthValue >= pev->max_health)
+         || (!isArmorCharger && !isHealthCharger)) {
+
+         m_ignoredItems.push (m_pickupItem);
+         m_pickupItem = nullptr;
+         m_pickupType = Pickup::None;
+         completeTask ();
+         break;
       }
 
-      // near to the button?
-      if (itemDistanceSq < distanceToButtonSq) {
+      if (itemDistanceSq < cr::sqrf (96.0f)) {
          m_moveSpeed = 0.0f;
          m_strafeSpeed = 0.0f;
          m_moveToGoal = false;
          m_checkTerrain = false;
 
-         // find angles from bot origin to entity...
          const float angleToEntity = isInFOV (dest - getEyesPos ());
 
-         // facing it directly?
-         if (angleToEntity <= 10.0f) {
-            MDLL_Use (m_pickupItem, ent ());
-
-            m_pickupItem = nullptr;
-            m_pickupType = Pickup::None;
-            m_buttonPushTime = game.time () + 3.0f;
-
-            completeTask ();
+         if (angleToEntity <= 15.0f) {
+            MDLL_Use (m_pickupItem, ent ()); // continuous use while standing there
          }
       }
       break;
+   }
    }
 }

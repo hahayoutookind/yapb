@@ -1288,11 +1288,12 @@ void Bot::handleHLWeapons (float distance, int id, int choosen) {
 bool Bot::handleHLSpecialWeapon (float distance, int id) {
    const float timeDelta = game.time () - m_frameInterval;
    const bool enemyVisible = !game.isNullEntity (m_enemy) && (m_states & Sense::SeeingEnemy);
+   const bool hearingOrHid = !!(m_states & (Sense::HearingEnemy | Sense::SuspectEnemy));
 
    switch (id) {
    case HLWeapon::Shotgun:
-      // double-barrel at close range when we have shells
-      if (distance < 180.0f && getAmmoInClip () >= 2 && enemyVisible) {
+      // double-barrel at close range when we have shells (overrides crowbar preference)
+      if (distance < 180.0f && getAmmoInClip () >= 2 && (enemyVisible || distance < 100.0f)) {
          if ((m_oldButtons & IN_ATTACK2) == 0) {
             pev->button |= IN_ATTACK2;
          }
@@ -1302,34 +1303,47 @@ bool Bot::handleHLSpecialWeapon (float distance, int id) {
       break;
 
    case HLWeapon::MP5:
-      // secondary grenade launcher at mid/long range
-      if (distance > 350.0f && distance < 900.0f && getAmmo2 (id) > 0 && enemyVisible && !m_fireHurtsFriend) {
-         if ((m_oldButtons & IN_ATTACK2) == 0) {
-            pev->button |= IN_ATTACK2;
+      // secondary grenade launcher — aim like CS grenades then fire when lined up
+      if (m_hlWantMp5Grenade && getAmmo2 (id) > 0 && !m_fireHurtsFriend) {
+         if (util.getConeDeviation (ent (), m_throw) >= 0.92f) {
+            if ((m_oldButtons & IN_ATTACK2) == 0) {
+               pev->button |= IN_ATTACK2;
+            }
+            m_shootTime = timeDelta + 0.4f;
+            m_hlWantMp5Grenade = false;
          }
-         m_shootTime = timeDelta + 0.4f;
          return true;
       }
       break;
 
-   case HLWeapon::Gauss:
+   case HLWeapon::Gauss: {
       // cancel charge underwater
       if (pev->waterlevel >= 3) {
          m_hlGaussChargeTime = 0.0f;
          break;
       }
 
-      // long-range charged shot
-      if (distance > 500.0f && enemyVisible && getAmmo (id) > 5) {
+      const Vector &wallTarget = !m_lastEnemyOrigin.empty ()
+         ? m_lastEnemyOrigin
+         : (!game.isNullEntity (m_enemy) ? m_enemy->v.origin : Vector {});
+
+      const bool wallShot = getAmmo (id) > 5
+         && !wallTarget.empty ()
+         && (
+            (hearingOrHid && !enemyVisible)
+            || (!enemyVisible && isPenetrableObstacle (wallTarget))
+            || (enemyVisible && isPenetrableObstacle (wallTarget))
+         );
+
+      // charge secondary for exactly 3s, then release once (no endless hold)
+      if (wallShot) {
          if (cr::fzero (m_hlGaussChargeTime)) {
             m_hlGaussChargeTime = game.time ();
          }
 
-         // hold secondary to charge
          pev->button |= IN_ATTACK2;
 
-         // release after ~1s charge
-         if (game.time () - m_hlGaussChargeTime > rg (0.8f, 1.4f)) {
+         if (game.time () - m_hlGaussChargeTime >= 3.0f) {
             pev->button &= ~IN_ATTACK2;
             m_hlGaussChargeTime = 0.0f;
             m_shootTime = timeDelta + 0.3f;
@@ -1337,13 +1351,18 @@ bool Bot::handleHLSpecialWeapon (float distance, int id) {
          return true;
       }
 
-      // tap primary for light shots
+      // tap primary for light shots when enemy is visible
       m_hlGaussChargeTime = 0.0f;
-      if ((m_oldButtons & IN_ATTACK) == 0) {
-         pev->button |= IN_ATTACK;
+
+      if (enemyVisible) {
+         if ((m_oldButtons & IN_ATTACK) == 0) {
+            pev->button |= IN_ATTACK;
+         }
+         m_shootTime = timeDelta + rg (0.15f, 0.3f);
+         return true;
       }
-      m_shootTime = timeDelta + rg (0.15f, 0.3f);
-      return true;
+      break;
+   }
 
    case HLWeapon::Egon:
       if (enemyVisible && getAmmo (id) > 0) {
@@ -1354,6 +1373,31 @@ bool Bot::handleHLSpecialWeapon (float distance, int id) {
       break;
 
    case HLWeapon::Crossbow:
+      // treat as sniper: never fire at close range, only when scoped
+      if (distance <= 250.0f) {
+         if (pev->fov < 90.0f && m_zoomCheckTime < game.time ()) {
+            pev->button |= IN_ATTACK2; // leave scope
+            m_zoomCheckTime = game.time () + 0.5f;
+         }
+         return true; // do not shoot
+      }
+
+      if (pev->fov >= 90.0f && m_zoomCheckTime < game.time ()) {
+         pev->button |= IN_ATTACK2; // enter scope
+         m_zoomCheckTime = game.time () + 0.5f;
+         m_shootTime = timeDelta + 0.25f;
+         return true;
+      }
+
+      if (pev->fov < 90.0f && enemyVisible) {
+         if ((m_oldButtons & IN_ATTACK) == 0) {
+            pev->button |= IN_ATTACK;
+         }
+         m_shootTime = timeDelta + rg (0.35f, 0.55f);
+         return true;
+      }
+      return true;
+
    case HLWeapon::Python:
       // zoom at long range
       if (distance > 400.0f && pev->fov >= 90.0f && m_zoomCheckTime < game.time ()) {
@@ -1521,8 +1565,32 @@ void Bot::fireWeapons () {
       && !isGroupOfEnemies (pev->origin)
       && getCurrentTaskId () != Task::Camp) {
 
+      // half-life: shotgun secondary beats crowbar at close range
+      if (game.is (GameFlags::HalfLife)
+         && (pev->weapons & cr::bit (HLWeapon::Shotgun))
+         && (m_ammoInClip[HLWeapon::Shotgun] >= 2 || getAmmo (HLWeapon::Shotgun) > 0)) {
+         selectId = HLWeapon::Shotgun;
+      }
       handleWeapons (distance, selectIndex, selectId, choosenWeapon);
       return;
+   }
+
+   // half-life: prefer gauss/egon and skip deployables for general combat
+   if (game.is (GameFlags::HalfLife)) {
+      selectId = selectHLCombatWeapon (distance);
+
+      if (selectId != getMeleeWeaponId ()) {
+         choosenWeapon = 0;
+
+         while (tab[choosenWeapon].id) {
+            if (tab[choosenWeapon].id == selectId) {
+               break;
+            }
+            ++choosenWeapon;
+         }
+         handleWeapons (distance, selectIndex, selectId, choosenWeapon);
+         return;
+      }
    }
 
    // loop through all the weapons until terminator is found...
@@ -2141,6 +2209,20 @@ void Bot::selectBestWeapon () {
    const auto tab = conf.getRawWeapons ();
    const int numWeapons = getNumWeapons ();
 
+   // half-life: always prefer egon/gauss when they have ammo
+   if (game.is (GameFlags::HalfLife)) {
+      const int preferred = selectHLCombatWeapon (512.0f);
+
+      if (preferred != getMeleeWeaponId () && m_currentWeapon != preferred) {
+         selectWeaponById (preferred);
+         m_isReloading = false;
+         m_reloadState = Reload::None;
+         m_hlGaussChargeTime = 0.0f;
+         m_hlGrenadeCookTime = 0.0f;
+         return;
+      }
+   }
+
    int selectIndex = 0;
    int chosenWeaponIndex = 0;
 
@@ -2154,7 +2236,8 @@ void Bot::selectBestWeapon () {
       }
 
       // skip deployables for general combat selection on half-life (handled specially)
-      if (game.is (GameFlags::HalfLife) && tab[selectIndex].type == WeaponType::Deployable) {
+      if (game.is (GameFlags::HalfLife)
+         && (tab[selectIndex].type == WeaponType::Deployable || tab[selectIndex].type == WeaponType::Explosive)) {
          ++selectIndex;
          continue;
       }
@@ -2900,6 +2983,108 @@ int Bot::getAmmo2 (int id) const {
       return 0;
    }
    return m_ammo[prop.ammo2];
+}
+
+int Bot::selectHLCombatWeapon (float distance) const {
+   // prefer egon, then gauss, then shotgun at close range; skip sniper/crossbow up close
+   const auto weapons = pev->weapons;
+   const auto tab = conf.getRawWeapons ();
+
+   auto hasUsable = [&] (int id) -> bool {
+      if (!(weapons & cr::bit (id))) {
+         return false;
+      }
+
+      for (int i = 0; tab[i].id; ++i) {
+         if (tab[i].id != id) {
+            continue;
+         }
+
+         if (tab[i].maxClip < 0) {
+            return getAmmo (id) > 0 || getAmmo (id) < 0;
+         }
+         return m_ammoInClip[id] > 0 || getAmmo (id) >= tab[i].minPrimaryAmmo;
+      }
+      return false;
+   };
+
+   if (hasUsable (HLWeapon::Egon)) {
+      return HLWeapon::Egon;
+   }
+   if (hasUsable (HLWeapon::Gauss)) {
+      return HLWeapon::Gauss;
+   }
+   if (distance < 180.0f && hasUsable (HLWeapon::Shotgun)) {
+      return HLWeapon::Shotgun;
+   }
+
+   int selectIndex = 0;
+   int chosen = getMeleeWeaponId ();
+
+   while (tab[selectIndex].id) {
+      const int wid = tab[selectIndex].id;
+      const int type = tab[selectIndex].type;
+
+      if (!(weapons & cr::bit (wid))) {
+         ++selectIndex;
+         continue;
+      }
+      if (type == WeaponType::Deployable || type == WeaponType::Explosive || type == WeaponType::Melee) {
+         ++selectIndex;
+         continue;
+      }
+      // crossbow only past close range
+      if (wid == HLWeapon::Crossbow && distance <= 250.0f) {
+         ++selectIndex;
+         continue;
+      }
+
+      const bool hasClipAmmo = tab[selectIndex].maxClip < 0
+         ? (getAmmo (wid) != 0)
+         : (m_ammoInClip[wid] > 0);
+
+      if (hasClipAmmo) {
+         chosen = wid;
+      }
+      ++selectIndex;
+   }
+   return chosen;
+}
+
+bool Bot::updateHLMp5GrenadeAim () {
+   m_hlWantMp5Grenade = false;
+
+   if (!game.is (GameFlags::HalfLife)
+      || m_currentWeapon != HLWeapon::MP5
+      || game.isNullEntity (m_enemy)
+      || !(m_states & Sense::SeeingEnemy)
+      || m_fireHurtsFriend) {
+      return false;
+   }
+
+   const float distance = m_enemy->v.origin.distance (pev->origin);
+
+   if (distance <= 350.0f || distance >= 900.0f || getAmmo2 (HLWeapon::MP5) <= 0) {
+      return false;
+   }
+
+   const Vector dest = m_enemy->v.origin + m_enemy->v.velocity.get2d ();
+   Vector throwVel = calcThrow (getEyesPos (), dest);
+
+   if (throwVel.lengthSq () < 100.0f) {
+      throwVel = calcToss (pev->origin, dest);
+   }
+
+   if (throwVel.lengthSq () <= 100.0f) {
+      return false;
+   }
+
+   m_throw = dest;
+   m_grenade = throwVel;
+   m_hlWantMp5Grenade = true;
+   m_aimFlags |= AimFlags::Grenade;
+   m_wantsToFire = true;
+   return true;
 }
 
 int Bot::getMeleeWeaponId () const {

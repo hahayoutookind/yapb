@@ -2033,9 +2033,10 @@ void GameState::updateInterestingEntities () {
          m_interestingEntities.push (e);
       }
 
-      // half-life world weapons and ammo
+      // half-life world weapons, ammo, items and wall chargers
       if (game.is (GameFlags::HalfLife)
-         && (classname.startsWith ("weapon_") || classname.startsWith ("ammo_"))) {
+         && (classname.startsWith ("weapon_") || classname.startsWith ("ammo_")
+            || classname == "func_recharge" || classname == "func_healthcharger")) {
          m_interestingEntities.push (e);
       }
 
