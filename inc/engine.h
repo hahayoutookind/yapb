@@ -396,6 +396,13 @@ public:
       if (isNullEntity (ent)) {
          return Team::Unassigned;
       }
+      // true (non-teamplay) half-life deathmatch never sends a TeamInfo message
+      // for a normal spawn, so client.team stays 0 for every player forever.
+      // give each player a unique "team" here so bots treat one another (and
+      // you) as enemies instead of teammates.
+      if (is (GameFlags::HalfLife) && is (GameFlags::FreeForAll)) {
+         return indexOfPlayer (ent);
+      }
       return util.getClient (indexOfPlayer (ent)).team;
    }
 
