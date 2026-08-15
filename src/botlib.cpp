@@ -3526,7 +3526,7 @@ void Bot::spawned () {
 
       m_buyingFinished = true;
       if (game.is (GameFlags::HalfLife)) {
-         m_b = true; // force bot movement to be on
+         m_botMovement = true; // force bot movement to be on
       }
    }
 }
