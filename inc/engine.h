@@ -386,9 +386,17 @@ public:
       return m_startEntity;
    }
 
-   // get spawn count for team
+   // get spawn count for team (array only holds T/CT slots)
    int getSpawnCount (int team) const {
+      if (!isBotTeam (team)) {
+         return 0;
+      }
       return m_spawnCount[team];
+   }
+
+   // unique per-player team id for free-for-all (offset so it never collides with T/CT)
+   CR_FORCE_INLINE int getFreeForAllTeam (edict_t *ent) const {
+      return indexOfPlayer (ent) + kGameTeamNum;
    }
 
    // gets the player team
@@ -401,7 +409,7 @@ public:
       // give each player a unique "team" here so bots treat one another (and
       // you) as enemies instead of teammates.
       if (is (GameFlags::HalfLife) && is (GameFlags::FreeForAll)) {
-         return indexOfPlayer (ent);
+         return getFreeForAllTeam (ent);
       }
       return util.getClient (indexOfPlayer (ent)).team;
    }

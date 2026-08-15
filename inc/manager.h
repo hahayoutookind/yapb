@@ -118,6 +118,9 @@ public:
 
 public:
    bool getTeamEconomics (int team) const {
+      if (!isBotTeam (team)) {
+         return true;
+      }
       return m_teamData[team].positiveEco;
    }
 
@@ -163,24 +166,29 @@ public:
    }
 
    void setLastRadioTimestamp (const int team, const float timestamp) {
-      if (team == Team::CT || team == Team::Terrorist) {
+      if (isBotTeam (team)) {
          m_teamData[team].lastRadioTimestamp = timestamp;
       }
    }
 
    float getLastRadioTimestamp (const int team) const {
-      if (team == Team::CT || team == Team::Terrorist) {
+      if (isBotTeam (team)) {
          return m_teamData[team].lastRadioTimestamp;
       }
       return 0.0f;
    }
 
    void setLastRadio (const int team, const int radio) {
-      m_teamData[team].lastRadioSlot = radio;
+      if (isBotTeam (team)) {
+         m_teamData[team].lastRadioSlot = radio;
+      }
    }
 
    int getLastRadio (const int team) const {
-      return m_teamData[team].lastRadioSlot;
+      if (isBotTeam (team)) {
+         return m_teamData[team].lastRadioSlot;
+      }
+      return kInvalidRadioSlot;
    }
 
    void setLastChatTimestamp (const float timestamp) {

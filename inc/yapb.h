@@ -100,8 +100,8 @@ struct ClientNoise {
 struct Client {
    edict_t *ent {}; // pointer to actual edict
    Vector origin {}; // position in the world
-   int team {}; // bot team
-   int team2 {}; // real bot team in free for all mode (csdm)
+   int team {}; // bot team (unique per-player id when FreeForAll)
+   int team2 {}; // real bot team in free for all mode (csdm / hl teamplay)
    int flags {}; // client flags
    int radio {}; // radio orders
    int menu {}; // identifier to opened menu

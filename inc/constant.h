@@ -123,6 +123,11 @@ CR_DECLARE_SCOPED_ENUM (Team,
    Invalid = -1
 )
 
+// true for teams that may index m_teamData / practice team arrays (size kGameTeamNum)
+CR_FORCE_INLINE bool isBotTeam (const int team) {
+   return team == Team::Terrorist || team == Team::CT;
+}
+
 // counter-strike team id's (used by gamedll, for reference)
 CR_DECLARE_SCOPED_ENUM (CSTeam,
    Unassigned = 0,

@@ -358,7 +358,8 @@ void MessageDispatcher::netMsgTeamInfo () {
 
    // update player team
    client.team2 = m_teamInfoCache[teamName]; // update real team
-   client.team = game.is (GameFlags::FreeForAll) ? m_args[index].long_ : client.team2;
+   // free-for-all: unique id offset past T/CT so team-indexed arrays stay in bounds
+   client.team = game.is (GameFlags::FreeForAll) ? (m_args[index].long_ - 1 + kGameTeamNum) : client.team2;
 }
 
 void MessageDispatcher::netMsgScoreInfo () {

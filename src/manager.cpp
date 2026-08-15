@@ -1047,6 +1047,9 @@ void BotManager::updateTeamEconomics (int team, bool setTrue) {
    // that have not enough money to buy primary (with economics), and if this result higher 80%, player is can't
    // buy primary weapons.
 
+   if (!isBotTeam (team)) {
+      return;
+   }
    auto &ecoStatus = m_teamData[team].positiveEco;
 
    if (setTrue || !cv_economics_rounds) {
@@ -2103,6 +2106,9 @@ void BotManager::notifyBombDefuse () {
 }
 
 void BotManager::selectLeaders (int team, bool reset) {
+   if (!isBotTeam (team)) {
+      return;
+   }
    auto &leaderChoosen = m_teamData[team].leaderChoosen;
 
    if (reset) {

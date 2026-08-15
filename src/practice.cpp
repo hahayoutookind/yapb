@@ -15,7 +15,7 @@ int32_t BotPractice::getIndex (int32_t team, int32_t start, int32_t goal) {
 }
 
 void BotPractice::setIndex (int32_t team, int32_t start, int32_t goal, int32_t value) {
-   if (team != Team::Terrorist && team != Team::CT) {
+   if (!isBotTeam (team)) {
       return;
    }
 
@@ -34,7 +34,7 @@ int32_t BotPractice::getValue (int32_t team, int32_t start, int32_t goal) {
 }
 
 void BotPractice::setValue (int32_t team, int32_t start, int32_t goal, int32_t value) {
-   if (team != Team::Terrorist && team != Team::CT) {
+   if (!isBotTeam (team)) {
       return;
    }
 
@@ -53,7 +53,7 @@ int32_t BotPractice::getDamage (int32_t team, int32_t start, int32_t goal) {
 }
 
 void BotPractice::setDamage (int32_t team, int32_t start, int32_t goal, int32_t value) {
-   if (team != Team::Terrorist && team != Team::CT) {
+   if (!isBotTeam (team)) {
       return;
    }
 

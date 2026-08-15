@@ -265,6 +265,13 @@ void BotSupport::updateClients () {
          client.ent = player;
          client.flags |= ClientFlags::Used;
 
+         // half-life deathmatch never sends TeamInfo; keep client.team unique so friend/enemy
+         // checks that read client.team (not getPlayerTeam) stay consistent with bot m_team
+         if (game.is (GameFlags::HalfLife) && game.is (GameFlags::FreeForAll)) {
+            client.team = i + kGameTeamNum;
+            client.team2 = Team::Unassigned;
+         }
+
          if (game.isAliveEntity (player)) {
             client.flags |= ClientFlags::Alive;
          }

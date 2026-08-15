@@ -3834,7 +3834,7 @@ void Bot::updatePracticeValue (int damage) const {
    // gets called each time a bot gets damaged by some enemy. tries to achieve a statistic about most/less dangerous
    // nodes for a destination goal used for pathfinding
 
-   if (graph.length () < 1 || graph.hasChanged () || m_chosenGoalIndex < 0 || m_prevGoalIndex < 0) {
+   if (game.is (GameFlags::FreeForAll) || graph.length () < 1 || graph.hasChanged () || m_chosenGoalIndex < 0 || m_prevGoalIndex < 0) {
       return;
    }
    const auto health = static_cast <int> (m_healthValue);
@@ -3852,7 +3852,7 @@ void Bot::updatePracticeValue (int damage) const {
 void Bot::updatePracticeDamage (edict_t *attacker, int damage) {
    // this function gets called each time a bot gets damaged by some enemy. stores the damage (team-specific) done by victim.
 
-   if (!game.isPlayerEntity (attacker)) {
+   if (game.is (GameFlags::FreeForAll) || !game.isPlayerEntity (attacker)) {
       return;
    }
 
@@ -4157,7 +4157,7 @@ void Bot::updateHearing () {
       if (!(client.flags & ClientFlags::Used)
          || !(client.flags & ClientFlags::Alive)
          || client.ent == ent ()
-         || client.team2 == m_team
+         || client.team == m_team
          || !client.ent
          || client.noise.last < game.time ()) {
 

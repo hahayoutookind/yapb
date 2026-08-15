@@ -120,10 +120,16 @@ private:
 
 public:
    template <typename U = int32_t> U getHighestDamageForTeam (int32_t team) const {
+      if (!isBotTeam (team)) {
+         return static_cast <U> (1);
+      }
       return static_cast <U> (cr::max (1, m_teamHighestDamage[team]));
    }
 
    void setHighestDamageForTeam (int32_t team, int32_t value) {
+      if (!isBotTeam (team)) {
+         return;
+      }
       m_teamHighestDamage[team] = value;
    }
 };
