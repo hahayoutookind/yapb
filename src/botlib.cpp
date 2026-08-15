@@ -3524,6 +3524,7 @@ void Bot::spawned () {
       clearTasks ();
 
       m_buyingFinished = true;
+      m_isStale = false;
    }
 }
 
