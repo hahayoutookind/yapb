@@ -3208,7 +3208,7 @@ void Bot::update () {
       && !(pev->maxspeed < 10.0f && tid != Task::PlantBomb && tid != Task::DefuseBomb)
       && !cv_freeze_bots
       && !graph.hasChanged ())
-      || (game.is (GameFlags::HalfLife) && !cv_freeze_bots && !(pev->maxspeed < 10.0f))) {
+      || (game.is (GameFlags::HalfLife) && !cv_freeze_bots)) {
 
       m_botMovement = true;
    }
@@ -3526,7 +3526,7 @@ void Bot::spawned () {
 
       m_buyingFinished = true;
       if (game.is (GameFlags::HalfLife)) {
-         m_botMovement = true; // force bot movement to be on
+         m_b = true; // force bot movement to be on
       }
    }
 }
