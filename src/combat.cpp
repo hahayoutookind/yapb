@@ -2917,6 +2917,7 @@ bool Bot::canCamp () const {
    if (game.is (GameFlags::HalfLife) || game.is (GameFlags::CSDM)) {
       return false;
    }
+   extern ConVar cv_camping_allowed;
    return cv_camping_allowed.as <bool> ();
 }
 
