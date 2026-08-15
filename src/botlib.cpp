@@ -3204,10 +3204,10 @@ void Bot::update () {
          m_voteMap = 0;
       }
    }
-   else if (m_buyingFinished
+   else if ((m_buyingFinished
       && !(pev->maxspeed < 10.0f && tid != Task::PlantBomb && tid != Task::DefuseBomb)
       && !cv_freeze_bots
-      && !graph.hasChanged ()
+      && !graph.hasChanged ())
       || (game.is (GameFlags::HalfLife) && !cv_freeze_bots && !(pev->maxspeed < 10.0f))) {
 
       m_botMovement = true;
