@@ -2917,8 +2917,7 @@ bool Bot::canCamp () const {
    if (game.is (GameFlags::HalfLife) || game.is (GameFlags::CSDM)) {
       return false;
    }
-//   return cv_camping_allowed.as <bool> ();
-   return false;
+   return cv_camping_allowed.as <bool> ();
 }
 
 void Bot::selectWeaponByIndex (int index) {

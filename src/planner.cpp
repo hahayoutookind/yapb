@@ -263,9 +263,10 @@ AStarResult AStarAlgo::find (int botTeam, int srcIndex, int destIndex, NodeAdder
    // round start randomizer offset
    auto rsRandomizer = 1.0f;
 
-   // randomize path on round start now and then
+   // randomize path on round start now and then (clamp team so ffa ids don't explode costs)
    if (cv_path_randomize_on_round_start && gameState.getRoundStartTime () + 2.0f > game.time ()) {
-      rsRandomizer = rg (0.5f, static_cast <float> (botTeam) * 2.0f);
+      const float teamScale = static_cast <float> (cr::max (1, botTeam % kGameTeamNum) + 1);
+      rsRandomizer = rg (0.5f, teamScale * 2.0f);
    }
 
    while (!m_routeQue.empty ()) {

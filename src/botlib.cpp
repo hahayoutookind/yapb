@@ -3170,12 +3170,17 @@ void Bot::update () {
    // is bot movement enabled
    m_botMovement = false;
 
-   // for some unknown reason some bots have speed of 1.0 after respawn on csdm
-   if (game.is (GameFlags::CSDM) && cr::fequal (pev->maxspeed, 1.0f) && tid == Task::Normal) {
+   // half-life never writes pev->maxspeed (cs / some csdm builds do); bots use it as
+   // RunPlayerMove forward speed, so leave it at 0 and they stand still forever
+   if (game.is (GameFlags::HalfLife | GameFlags::CSDM) && pev->maxspeed < 10.0f) {
       static ConVarRef sv_maxspeed ("sv_maxspeed");
 
-      // reset max speed to max value, thus allowing bot movement
-      pev->maxspeed = sv_maxspeed.value ();
+      if (sv_maxspeed.exists () && sv_maxspeed.value () > 0.0f) {
+         pev->maxspeed = sv_maxspeed.value ();
+      }
+      else {
+         pev->maxspeed = 270.0f;
+      }
    }
 
    // if the bot hasn't selected stuff to start the game yet, go do that...
@@ -3522,11 +3527,12 @@ void Bot::logic () {
 void Bot::spawned () {
    if (game.is (GameFlags::CSDM | GameFlags::ZombieMod | GameFlags::HalfLife)) {
       newRound ();
-      clearTasks ();
 
       m_buyingFinished = true;
+      m_isStale = false;
+
       if (game.is (GameFlags::HalfLife)) {
-         m_botMovement = true; // force bot movement to be on
+         m_botMovement = true;
       }
    }
 }
