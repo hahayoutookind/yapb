@@ -252,7 +252,9 @@ CR_DECLARE_SCOPED_ENUM (WeaponType,
    Rifle,
    SMG,
    Sniper,
-   Heavy
+   Heavy,
+   Explosive, // hl handgrenade / mp5 grenade launcher use
+   Deployable // satchel / tripmine / snark
 )
 
 // counter-strike weapon id's
@@ -290,6 +292,26 @@ CR_DECLARE_SCOPED_ENUM (Weapon,
    Armor = 31,
    ArmorHelm = 32,
    Defuser = 33
+)
+
+// half-life deathmatch weapon id's (from hlsdk weapons.h)
+CR_DECLARE_SCOPED_ENUM (HLWeapon,
+   Crowbar = 1,
+   Glock = 2,
+   Python = 3,
+   MP5 = 4,
+   Chaingun = 5,
+   Crossbow = 6,
+   Shotgun = 7,
+   RPG = 8,
+   Gauss = 9,
+   Egon = 10,
+   Hornetgun = 11,
+   HandGrenade = 12,
+   Tripmine = 13,
+   Satchel = 14,
+   Snark = 15,
+   Suit = 31
 )
 
 // buy counts
@@ -451,7 +473,8 @@ constexpr auto kMinMovedDistance = cr::sqrf (2.0f);
 
 constexpr auto kInfiniteDistanceLong = static_cast <int> (kInfiniteDistance);
 constexpr auto kMaxWeapons = 32;
-constexpr auto kNumWeapons = 26;
+constexpr auto kNumWeapons = 26; // cs weapon table length (excluding terminator)
+constexpr auto kNumHLWeapons = 14; // hl weapon table length (excluding terminator)
 constexpr auto kMaxCollideMoves = 4;
 constexpr auto kGameMaxPlayers = 32;
 constexpr auto kGameTeamNum = 2;
@@ -491,6 +514,21 @@ constexpr auto kSniperWeaponMask = (cr::bit (Weapon::Scout)
    | cr::bit (Weapon::SG550)
    | cr::bit (Weapon::AWP)
    | cr::bit (Weapon::G3SG1));
+
+// half-life deathmatch firearm / throwable weapon bits (excludes crowbar)
+constexpr auto kHLCombatWeaponMask = (cr::bit (HLWeapon::Glock)
+   | cr::bit (HLWeapon::Python)
+   | cr::bit (HLWeapon::MP5)
+   | cr::bit (HLWeapon::Crossbow)
+   | cr::bit (HLWeapon::Shotgun)
+   | cr::bit (HLWeapon::RPG)
+   | cr::bit (HLWeapon::Gauss)
+   | cr::bit (HLWeapon::Egon)
+   | cr::bit (HLWeapon::Hornetgun)
+   | cr::bit (HLWeapon::HandGrenade)
+   | cr::bit (HLWeapon::Tripmine)
+   | cr::bit (HLWeapon::Satchel)
+   | cr::bit (HLWeapon::Snark));
 
 // weapons < 7 are secondary
 constexpr auto kPrimaryWeaponMinIndex = 7;

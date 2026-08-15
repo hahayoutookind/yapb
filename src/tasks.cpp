@@ -118,7 +118,7 @@ void Bot::normal_ () {
       }
 
       // reached node is a camp node
-      if ((m_pathFlags & NodeFlag::Camp) && !game.is (GameFlags::CSDM) && cv_camping_allowed && !isKnifeMode ()) {
+      if ((m_pathFlags & NodeFlag::Camp) && canCamp () && !isKnifeMode ()) {
          const bool allowedCampWeapon = hasPrimaryWeapon ()
             || hasShield ()
             || (hasSecondaryWeapon () && !hasPrimaryWeapon () && m_numFriendsLeft > game.maxClients () / 6);
@@ -971,7 +971,7 @@ void Bot::defuseBomb_ () {
          const int weaponIndex = getBestOwnedWeapon ();
 
          // just select knife and then select weapon
-         selectWeaponById (Weapon::Knife);
+         selectWeaponById (getMeleeWeaponId ());
 
          if (weaponIndex > 0 && weaponIndex < kNumWeapons) {
             selectWeaponByIndex (weaponIndex);
@@ -1404,7 +1404,7 @@ void Bot::escapeFromBomb_ () {
    }
 
    if (!usesKnife () && game.isNullEntity (m_enemy) && !game.isAliveEntity (m_lastEnemy)) {
-      selectWeaponById (Weapon::Knife);
+      selectWeaponById (getMeleeWeaponId ());
    }
 
    // reached destination?
@@ -1543,6 +1543,11 @@ void Bot::pickupItem_ () {
    case Pickup::Weapon:
    case Pickup::AmmoAndKits:
       m_aimFlags |= AimFlags::Nav;
+
+      // half-life: carry all weapons — just walk into pickups, no drop/buy
+      if (game.is (GameFlags::HalfLife)) {
+         break;
+      }
 
       // near to weapon?
       if (itemDistanceSq < cr::sqrf (50.0f)) {

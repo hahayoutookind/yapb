@@ -1738,7 +1738,12 @@ void Bot::newRound () {
    }
 
    // and put buying into its message queue
-   pushMsgQueue (BotMsg::Buy);
+   if (!game.is (GameFlags::HalfLife)) {
+      pushMsgQueue (BotMsg::Buy);
+   }
+   else {
+      m_buyingFinished = true;
+   }
    startTask (Task::Normal, TaskPri::Normal, kInvalidNodeIndex, 0.0f, true);
 
    // restore fake client bit, just in case
@@ -1858,6 +1863,59 @@ void Bot::updateTeamJoin () {
    if (!m_notStarted) {
       return;
    }
+
+   // half-life: no cs team/class menus; ffa spawns immediately, teamplay balances via model/team
+   if (game.is (GameFlags::HalfLife)) {
+      if (game.is (GameFlags::FreeForAll)) {
+         m_notStarted = false;
+         m_buyingFinished = true;
+
+         if (rg.chance (20)) {
+            m_needToSendWelcomeChat = true;
+         }
+         return;
+      }
+
+      // teamplay: pick a team name from mp_teamlist if available
+      static ConVarRef mp_teamlist ("mp_teamlist");
+      String teamName = "hgrunt";
+
+      if (mp_teamlist.exists ()) {
+         const char *list = engfuncs.pfnCVarGetString ("mp_teamlist");
+
+         if (!strings.isEmpty (list)) {
+            auto teams = String (list).split (";");
+
+            if (!teams.empty ()) {
+               const auto &players = bots.countTeamPlayers ();
+               int pick = 0;
+
+               if (players.first > players.second && teams.length () > 1) {
+                  pick = 1;
+               }
+               else if (players.first < players.second) {
+                  pick = 0;
+               }
+               else {
+                  pick = rg (0, static_cast <int> (teams.length ()) - 1);
+               }
+               teamName = teams[pick].trim ();
+            }
+         }
+      }
+
+      if (!teamName.empty ()) {
+         issueCommand ("model %s", teamName.chars ());
+      }
+      m_notStarted = false;
+      m_buyingFinished = true;
+
+      if (rg.chance (20)) {
+         m_needToSendWelcomeChat = true;
+      }
+      return;
+   }
+
    const auto botTeam = game.getRealPlayerTeam (ent ());
 
    // cs prior beta 7.0 uses hud-based motd, so press fire once

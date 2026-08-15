@@ -176,6 +176,11 @@ void BotConfig::loadNamesConfig () {
 void BotConfig::loadWeaponsConfig () {
    setupMemoryFiles ();
 
+   // half-life uses built-in weapon table / prefs; ignore cs weapon.cfg
+   if (game.is (GameFlags::HalfLife)) {
+      return;
+   }
+
    auto addWeaponEntries = [] (SmallArray <WeaponInfo> &weapons, bool as, StringRef name, const StringArray &data) {
 
       // we're have null terminator element in weapons array...
@@ -862,6 +867,36 @@ void BotConfig::setBotNameUsed (const int index, StringRef name) {
 void BotConfig::initWeapons () {
    m_weapons.clear ();
 
+   if (game.is (GameFlags::HalfLife)) {
+      // preference indices map into this array order (lower index = lower preference in prefs arrays)
+      // fill array with available half-life weapons
+      m_weapons = {
+         { HLWeapon::Crowbar, "weapon_crowbar", "crowbar.mdl", 0, 0, -1, -1, 0, 0, 0, 0, 0, -1, WeaponType::Melee, true },
+         { HLWeapon::Glock, "weapon_9mmhandgun", "9mmhandgun.mdl", 0, 1, -1, -1, 1, 1, 1, 1, 0, 17, WeaponType::Pistol, true },
+         { HLWeapon::Python, "weapon_357", "357.mdl", 0, 1, -1, -1, 1, 2, 2, 2, 2, 6, WeaponType::Pistol, false },
+         { HLWeapon::MP5, "weapon_9mmAR", "9mmAR.mdl", 0, 1, -1, -1, 2, 1, 1, 1, 1, 50, WeaponType::SMG, true },
+         { HLWeapon::Shotgun, "weapon_shotgun", "shotgun.mdl", 0, 1, -1, -1, 2, 2, 2, 2, 0, 8, WeaponType::Shotgun, false },
+         { HLWeapon::Crossbow, "weapon_crossbow", "crossbow.mdl", 0, 1, -1, -1, 3, 1, 1, 1, 2, 5, WeaponType::Sniper, false },
+         { HLWeapon::RPG, "weapon_rpg", "rpg.mdl", 0, 1, -1, -1, 3, 2, 2, 2, 3, 1, WeaponType::Heavy, false },
+         { HLWeapon::Gauss, "weapon_gauss", "gauss.mdl", 0, 1, -1, -1, 3, 3, 3, 3, 3, -1, WeaponType::Rifle, false },
+         { HLWeapon::Egon, "weapon_egon", "egon.mdl", 0, 1, -1, -1, 3, 4, 4, 4, 2, -1, WeaponType::Heavy, true },
+         { HLWeapon::Hornetgun, "weapon_hornetgun", "hgun.mdl", 0, 1, -1, -1, 4, 1, 1, 1, 0, -1, WeaponType::SMG, true },
+         { HLWeapon::HandGrenade, "weapon_handgrenade", "grenade.mdl", 0, 1, -1, -1, 4, 2, 2, 2, 0, -1, WeaponType::Explosive, false },
+         { HLWeapon::Satchel, "weapon_satchel", "satchel.mdl", 0, 1, -1, -1, 4, 3, 3, 3, 0, -1, WeaponType::Deployable, false },
+         { HLWeapon::Tripmine, "weapon_tripmine", "tripmine.mdl", 0, 1, -1, -1, 4, 4, 4, 4, 0, -1, WeaponType::Deployable, false },
+         { HLWeapon::Snark, "weapon_snark", "squeak.mdl", 0, 1, -1, -1, 4, 5, 5, 5, 0, -1, WeaponType::Deployable, false },
+
+         // terminator
+         { 0, "", "", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, WeaponType::None, false }
+      };
+
+      // preference order: indices into m_weapons (higher pref later in selection via reverse walk)
+      m_normalWeaponPrefs = { 0, 13, 12, 11, 10, 9, 1, 2, 4, 3, 5, 8, 6, 7 };
+      m_rusherWeaponPrefs = { 0, 13, 12, 11, 10, 1, 9, 2, 5, 6, 8, 7, 4, 3 };
+      m_carefulWeaponPrefs = { 0, 13, 12, 11, 10, 9, 1, 4, 3, 8, 2, 6, 7, 5 };
+      return;
+   }
+
    // fill array with available weapons
    m_weapons = {
       { Weapon::Knife, "weapon_knife", "knife.mdl", 0, 0, -1, -1, 0, 0, 0, 0, 0, 0, WeaponType::Melee, true },
@@ -894,6 +929,10 @@ void BotConfig::initWeapons () {
       // not needed actually, but cause too much refactoring for now. todo
       { 0, "", "", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, WeaponType::None, false }
    };
+
+   m_normalWeaponPrefs = { 0, 2, 1, 4, 5, 6, 3, 12, 10, 24, 25, 13, 11, 8, 7, 22, 23, 18, 21, 17, 19, 15, 17, 9, 14, 16 };
+   m_rusherWeaponPrefs = { 0, 2, 1, 4, 5, 6, 3, 24, 19, 22, 23, 20, 21, 10, 12, 13, 7, 8, 11, 9, 18, 17, 19, 25, 15, 16 };
+   m_carefulWeaponPrefs = { 0, 2, 1, 4, 25, 6, 3, 7, 8, 12, 10, 13, 11, 9, 24, 18, 14, 17, 16, 15, 19, 20, 21, 22, 23, 5 };
 }
 
 void BotConfig::adjustWeaponPrices () {

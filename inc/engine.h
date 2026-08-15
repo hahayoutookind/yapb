@@ -49,7 +49,8 @@ CR_DECLARE_SCOPED_ENUM (GameFlags,
    AnniversaryHL25 = cr::bit (12), // half-life 25th anniversary engine
    Xash3DLegacy = cr::bit (13), // old xash3d-branch
    ZombieMod = cr::bit (14), // zombie mod is active
-   HasStudioModels = cr::bit (15) // game supports studio models, so we can use hitbox-based aiming
+   HasStudioModels = cr::bit (15), // game supports studio models, so we can use hitbox-based aiming
+   HalfLife = cr::bit (16) // half-life deathmatch (valve) instead of counter-strike
 )
 
 // defines map type

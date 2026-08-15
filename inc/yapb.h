@@ -42,6 +42,8 @@ struct WeaponProp {
    String classname {};
    int ammo1 {}; // ammo index for primary ammo
    int ammo1Max {}; // max primary ammo
+   int ammo2 {}; // ammo index for secondary ammo (hl mp5 grenades, etc.)
+   int ammo2Max {}; // max secondary ammo
    int slot {}; // HUD slot (0 based)
    int pos {}; // slot position
    int id {}; // weapon ID
@@ -529,6 +531,8 @@ private:
    void fireWeapons ();
    void doFireWeapons ();
    void handleWeapons (float distance, int index, int id, int choosen);
+   void handleHLWeapons (float distance, int id, int choosen);
+   bool handleHLSpecialWeapon (float distance, int id);
    void focusEnemy ();
    void selectBestWeapon ();
    void selectSecondary ();
@@ -688,7 +692,13 @@ public:
    int m_ammoInClip[kMaxWeapons] {}; // ammo in clip for each weapons
    int m_ammo[MAX_AMMO_SLOTS] {}; // total ammo amounts
    int m_deathCount {}; // number of bot deaths
+   int m_hlSatchelState {}; // 0 = place, 1 = detonate (hl satchel)
 
+   float m_hlGaussChargeTime {}; // when gauss charge started (0 = not charging)
+   float m_hlGrenadeCookTime {}; // when handgrenade pin was pulled (0 = idle)
+   float m_hlRpgSpotCheck {}; // next time to toggle rpg laser
+
+   bool m_hlRpgSpotActive {}; // rpg laser spot enabled
    bool m_isVIP {}; // bot is vip?
    bool m_isAlive {}; // has the player been killed or has he just respawned
    bool m_notStarted {}; // team/class not chosen yet
@@ -787,6 +797,10 @@ public:
 
    int getAmmo () const;
    int getAmmo (int id) const;
+   int getAmmo2 (int id) const;
+   int getMeleeWeaponId () const;
+   int getNumWeapons () const;
+   bool canCamp () const;
    int getNearestToPlantedBomb ();
 
    float getConnectionTime ();
@@ -886,7 +900,8 @@ private:
 
    // returns true if bot using not very good weapon
    bool usesBadWeapon () const {
-      return usesShotgun () || m_currentWeapon == Weapon::UMP45 || m_currentWeapon == Weapon::MAC10 || m_currentWeapon == Weapon::TMP;
+      return usesShotgun () || m_currentWeapon == Weapon::UMP45 || m_currentWeapon == Weapon::MAC10
+         || m_currentWeapon == Weapon::TMP || m_currentWeapon == HLWeapon::Hornetgun;
    }
 
    // returns true if bot using a camp gun

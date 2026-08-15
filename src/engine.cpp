@@ -130,13 +130,19 @@ void Game::levelInitialize (edict_t *entities, int max) {
          ent->v.effects |= EF_NODRAW;
       }
       else if (classname == "func_vip_safetyzone" || classname == "info_vip_safetyzone") {
-         m_mapFlags |= MapFlags::Assassination; // assassination map
+         if (!is (GameFlags::HalfLife)) {
+            m_mapFlags |= MapFlags::Assassination; // assassination map
+         }
       }
       else if (isHostageEntity (ent)) {
-         m_mapFlags |= MapFlags::HostageRescue; // rescue map
+         if (!is (GameFlags::HalfLife)) {
+            m_mapFlags |= MapFlags::HostageRescue; // rescue map
+         }
       }
       else if (classname == "func_bomb_target" || classname == "info_bomb_target") {
-         m_mapFlags |= MapFlags::Demolition; // defusion map
+         if (!is (GameFlags::HalfLife)) {
+            m_mapFlags |= MapFlags::Demolition; // defusion map
+         }
       }
       else if (classname == "func_escapezone") {
          m_mapFlags |= MapFlags::Escape;
@@ -189,6 +195,15 @@ void Game::onSpawnEntity (edict_t *ent) {
       return;
    }
    const auto classNameHash = ent->v.classname.str ().hash ();
+
+   // half-life deathmatch primarily uses info_player_deathmatch
+   if (is (GameFlags::HalfLife)) {
+      if (classNameHash == kEntityInfoPlayerDeathmatch || classNameHash == kEntityInfoPlayerStart) {
+         ++m_spawnCount[Team::Terrorist];
+         ++m_spawnCount[Team::CT];
+      }
+      return;
+   }
 
    if (classNameHash == kEntityInfoPlayerStart || classNameHash == kEntityInfoVIPStart) {
       ++m_spawnCount[Team::CT];
@@ -844,15 +859,25 @@ void Game::constructCSBinaryName (StringArray &libs) {
    }
    // else: suffix remains empty (e.g., x86 linux/windows/macos)
 
+   const bool isHalfLifeMod = getRunningModName () == "valve" || is (GameFlags::HalfLife);
+
    // build base names
    if (plat.android) {
-      // only "libcs" with suffix (no "mp", and must have "lib" prefix)
+      if (isHalfLifeMod) {
+         libs.push ("libhl" + suffix);
+      }
       libs.push ("libcs" + suffix);
+   }
+   else if (isHalfLifeMod) {
+      libs.push ("hl" + suffix);
+      libs.push ("cs" + suffix);
+      libs.push ("mp" + suffix);
    }
    else {
       // Standard: "mp" and "cs" with suffix
       libs.push ("cs" + suffix);
       libs.push ("mp" + suffix);
+      libs.push ("hl" + suffix);
    }
 }
 
@@ -940,6 +965,27 @@ bool Game::loadCSBinary () {
          // verify dll is OK 
          return libCheck (modname, lib);
       }
+      else if (modname == "valve" || lib.startsWith ("hl")) {
+         m_gameLib.load (path);
+
+         if (!libCheck (modname, lib)) {
+            return false;
+         }
+
+         m_gameFlags |= GameFlags::HalfLife;
+         m_gameFlags &= ~(GameFlags::Modern | GameFlags::Legacy | GameFlags::ConditionZero | GameFlags::HasBotVoice);
+
+         // xash3d half-life still supports studio models
+         if (m_gameFlags & GameFlags::Xash3D) {
+            m_gameFlags |= GameFlags::HasStudioModels;
+         }
+         enableFakePings ();
+
+         if (is (GameFlags::Metamod)) {
+            return false;
+         }
+         return true;
+      }
       else {
          m_gameLib.load (path);
 
@@ -948,8 +994,27 @@ bool Game::loadCSBinary () {
             return false;
          }
 
+         // detect half-life gamedll even under non-valve folder (metamod / custom)
+         auto crowbar = m_gameLib.resolve <EntityProto> ("weapon_crowbar");
+         auto famas = m_gameLib.resolve <EntityProto> ("weapon_famas");
+
+         if (crowbar != nullptr && famas == nullptr) {
+            m_gameFlags |= GameFlags::HalfLife;
+            m_gameFlags &= ~(GameFlags::Modern | GameFlags::Legacy | GameFlags::ConditionZero | GameFlags::HasBotVoice);
+
+            if (m_gameFlags & GameFlags::Xash3D) {
+               m_gameFlags |= GameFlags::HasStudioModels;
+            }
+            enableFakePings ();
+
+            if (is (GameFlags::Metamod)) {
+               return false;
+            }
+            return true;
+         }
+
          // detect if we're running modern game
-         auto entity = m_gameLib.resolve <EntityProto> ("weapon_famas");
+         auto entity = famas;
 
          // detect xash engine
          if (m_gameFlags & GameFlags::Xash3D) {
@@ -1045,8 +1110,11 @@ bool Game::postload () {
       m_gameFlags |= GameFlags::AnniversaryHL25;
    }
 
-   // initialize weapons
-   conf.initWeapons ();
+   // detect half-life by gamedir early (metamod may not open hl.dll itself)
+   if (getRunningModName () == "valve") {
+      m_gameFlags |= GameFlags::HalfLife;
+      m_gameFlags &= ~(GameFlags::Modern | GameFlags::Legacy | GameFlags::ConditionZero | GameFlags::HasBotVoice);
+   }
 
    // register engine lib handle
    m_engineLib.locate (reinterpret_cast <void *> (engfuncs.pfnPrecacheModel));
@@ -1055,6 +1123,7 @@ bool Game::postload () {
       m_gameFlags |= (GameFlags::Xash3D | GameFlags::Mobility | GameFlags::HasBotVoice | GameFlags::ReGameDLL);
 
       if (is (GameFlags::Metamod)) {
+         conf.initWeapons ();
          return true; // we should stop the attempt for loading the real gamedll, since metamod handle this for us
       }
    }
@@ -1063,6 +1132,9 @@ bool Game::postload () {
    if (!binaryLoaded && !is (GameFlags::Metamod)) {
       logger.fatal ("Mod that you has started, not supported by this bot (gamedir: %s)", getRunningModName ());
    }
+
+   // initialize weapons after game detection (cs vs half-life tables)
+   conf.initWeapons ();
 
    if (is (GameFlags::Metamod)) {
       m_gameLib.unload ();
@@ -1073,6 +1145,19 @@ bool Game::postload () {
 }
 
 void Game::applyGameModes () {
+   // half-life deathmatch / teamplay
+   if (is (GameFlags::HalfLife)) {
+      static ConVarRef mp_teamplay ("mp_teamplay");
+
+      if (!mp_teamplay.exists () || mp_teamplay.value () <= 0.0f) {
+         m_gameFlags |= GameFlags::FreeForAll;
+      }
+      else {
+         m_gameFlags &= ~GameFlags::FreeForAll;
+      }
+      return;
+   }
+
    if (!is (GameFlags::Metamod | GameFlags::ReGameDLL)) {
       return;
    }
@@ -1251,6 +1336,9 @@ void Game::printBotVersion () const {
    else if (is (GameFlags::ConditionZero)) {
       gameVersionStr.assign ("Condition Zero");
    }
+   else if (is (GameFlags::HalfLife)) {
+      gameVersionStr.assign ("Half-Life");
+   }
    else if (is (GameFlags::Modern)) {
       gameVersionStr.assign ("v1.6");
    }
@@ -1287,6 +1375,14 @@ void Game::printBotVersion () const {
 
    if (is (GameFlags::AnniversaryHL25)) {
       botRuntimeFlags.push ("HL25");
+   }
+
+   if (is (GameFlags::HalfLife)) {
+      botRuntimeFlags.push ("HalfLife");
+   }
+
+   if (is (GameFlags::FreeForAll) && is (GameFlags::HalfLife)) {
+      botRuntimeFlags.push ("FFA");
    }
 
    if (botRuntimeFlags.empty ()) {
@@ -1460,7 +1556,7 @@ bool Game::isDoorEntity (edict_t *ent) const {
 }
 
 bool Game::isHostageEntity (edict_t *ent) const {
-   if (isNullEntity (ent)) {
+   if (isNullEntity (ent) || is (GameFlags::HalfLife)) {
       return false;
    }
    const auto classHash = ent->v.classname.str ().hash ();
@@ -1934,6 +2030,12 @@ void GameState::updateInterestingEntities () {
 
       // search for grenades, weaponboxes, weapons, items and armoury entities
       if (classname.startsWith ("weaponbox") || classname.startsWith ("grenade") || game.isItemEntity (e) || classname.startsWith ("armoury")) {
+         m_interestingEntities.push (e);
+      }
+
+      // half-life world weapons and ammo
+      if (game.is (GameFlags::HalfLife)
+         && (classname.startsWith ("weapon_") || classname.startsWith ("ammo_"))) {
          m_interestingEntities.push (e);
       }
 

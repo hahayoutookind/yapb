@@ -459,6 +459,39 @@ void Bot::updatePickups () {
             allowPickup = true;
             pickupType = Pickup::DroppedC4;
          }
+         else if (game.is (GameFlags::HalfLife)
+            && (classname.startsWith ("weapon_") || classname.startsWith ("ammo_")
+               || classname.startsWith ("item_healthkit") || classname.startsWith ("item_battery")
+               || isWeaponBox)
+            && !m_isUsingGrenade) {
+
+            allowPickup = true;
+
+            if (classname.startsWith ("item_healthkit") || classname.startsWith ("item_battery")
+               || classname.startsWith ("ammo_")) {
+               pickupType = Pickup::AmmoAndKits;
+
+               if (classname.startsWith ("item_healthkit") && m_healthValue >= 100.0f) {
+                  allowPickup = false;
+               }
+               else if (classname.startsWith ("item_battery") && pev->armorvalue >= 100.0f) {
+                  allowPickup = false;
+               }
+            }
+            else {
+               pickupType = Pickup::Weapon;
+
+               // already own this world weapon?
+               if (classname.startsWith ("weapon_")) {
+                  for (const auto &info : conf.getWeapons ()) {
+                     if (info.id && classname == info.name && (pev->weapons & cr::bit (info.id))) {
+                        allowPickup = false;
+                        break;
+                     }
+                  }
+               }
+            }
+         }
          else if ((isWeaponBox || classname.startsWith ("armoury_entity") || (isCSDM && classname.startsWith ("csdm")))
             && !m_isUsingGrenade) {
 
@@ -1027,7 +1060,7 @@ void Bot::checkMsgQueue () {
          return;
       }
 
-      if (!m_inBuyZone || game.is (GameFlags::CSDM) || m_isCreature) {
+      if (!m_inBuyZone || game.is (GameFlags::CSDM) || game.is (GameFlags::HalfLife) || m_isCreature) {
          m_buyPending = true;
          m_buyingFinished = true;
 
@@ -1051,7 +1084,7 @@ void Bot::checkMsgQueue () {
       // if fun-mode no need to buy
       if (cv_jasonmode) {
          m_buyState = BuyState::Done;
-         selectWeaponById (Weapon::Knife);
+         selectWeaponById (getMeleeWeaponId ());
       }
 
       // prevent vip from buying
@@ -1291,6 +1324,12 @@ int Bot::pickBestWeapon (Array <int> &vec, int moneySave) const {
 void Bot::buyStuff () {
    // this function does all the work in selecting correct buy menus for most weapons/items
 
+   if (game.is (GameFlags::HalfLife)) {
+      m_buyingFinished = true;
+      m_buyState = BuyState::Done;
+      return;
+   }
+
    WeaponInfo *selectedWeapon = nullptr;
    m_nextBuyTime = game.time ();
 
@@ -1302,7 +1341,7 @@ void Bot::buyStuff () {
    Array <int32_t> choices {};
 
    // select the priority tab for this personality
-   const int *pref = conf.getWeaponPrefs (m_personality) + kNumWeapons;
+   const int *pref = conf.getWeaponPrefs (m_personality) + getNumWeapons ();
    const auto tab = conf.getRawWeapons ();
 
    const bool isPistolMode = tab[25].teamStandard == -1 && tab[3].teamStandard == 2;
@@ -1960,7 +1999,7 @@ void Bot::setConditions () {
 
          // if no more enemies found AND bomb planted, switch to knife to get to bomb place faster
          if (m_team == Team::CT && !usesKnife () && m_numEnemiesLeft == 0 && gameState.isBombPlanted ()) {
-            selectWeaponById (Weapon::Knife);
+            selectWeaponById (getMeleeWeaponId ());
             m_plantedBombNodeIndex = getNearestToPlantedBomb ();
 
             if (isOccupiedNode (m_plantedBombNodeIndex)) {
@@ -2240,6 +2279,11 @@ void Bot::clearTasks () {
 }
 
 void Bot::startTask (Task id, float desire, int data, float time, bool resume) {
+   // half-life multiplayer: never camp
+   if (id == Task::Camp && !canCamp ()) {
+      return;
+   }
+
    static const auto &filter = bots.getFilters ();
 
    for (auto &task : m_tasks) {
@@ -2720,7 +2764,7 @@ void Bot::checkRadioQueue () {
    case Radio::RegroupTeam:
       // if no more enemies found AND bomb planted, switch to knife to get to bombplace faster
       if (m_team == Team::CT && !usesKnife () && m_numEnemiesLeft == 0 && gameState.isBombPlanted () && getCurrentTaskId () != Task::DefuseBomb) {
-         selectWeaponById (Weapon::Knife);
+         selectWeaponById (getMeleeWeaponId ());
          clearSearchNodes ();
 
          m_position = gameState.getBombOrigin ();
@@ -3291,7 +3335,7 @@ void Bot::checkSpawnConditions () {
             }
 
             if (switchToKnife) {
-               selectWeaponById (Weapon::Knife);
+               selectWeaponById (getMeleeWeaponId ());
             }
          }
       }
@@ -4092,7 +4136,10 @@ bool Bot::isOutOfBombTimer () {
 }
 
 void Bot::updateHearing () {
-   if (game.is (GameFlags::FreeForAll) || m_enemyIgnoreTimer > game.time () || cv_ignore_enemies) {
+   // half-life ffa still needs hearing; only skip for cs csdm ffa
+   if ((game.is (GameFlags::FreeForAll) && !game.is (GameFlags::HalfLife))
+      || m_enemyIgnoreTimer > game.time ()
+      || cv_ignore_enemies) {
       return;
    }
    m_hearedEnemy = nullptr;

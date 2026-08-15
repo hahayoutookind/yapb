@@ -174,7 +174,7 @@ int Bot::findBestGoal () {
 
    float campDesire = rg (0.0f, 100.0f) + defensive;
 
-   if (!usesCampGun ()) {
+   if (!canCamp () || !usesCampGun ()) {
       campDesire = 0.0f;
    }
    else if (usesSniper ()) {
@@ -2600,7 +2600,7 @@ bool Bot::advanceMovement () {
                && (jumpDistanceSq > cr::sqrf (145.0f) || (dst.z - 32.0f > src.z && jumpDistanceSq > cr::sqrf (125.0f)))
                && !(m_states & Sense::SeeingEnemy)) {
 
-               selectWeaponById (Weapon::Knife); // draw out the knife if we needed
+               selectWeaponById (getMeleeWeaponId ()); // draw out the knife if we needed
             }
 
             // bot not already on ladder but will be soon?

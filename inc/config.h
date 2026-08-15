@@ -207,6 +207,11 @@ public:
       }
    }
 
+   // number of weapons in active table (excluding terminator)
+   int getWeaponCount () const {
+      return cr::max (0, static_cast <int> (m_weapons.length ()) - 1);
+   }
+
    // get's the difficulty level tweaks
    BotDifficultyData *getDifficultyTweaks (int32_t level) {
       return &m_difficulty[level];

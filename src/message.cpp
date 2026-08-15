@@ -124,7 +124,7 @@ void MessageDispatcher::netMsgShowMenu () {
 void MessageDispatcher::netMsgWeaponList () {
    // this message is sent when a client joins the game. All of the weapons are sent with the weapon ID and information about what ammo is used.
 
-   enum args { classname = 0, ammo_index_1 = 1, max_ammo_1 = 2, slot = 5, slot_pos = 6, id = 7, flags = 8, min = 9 };
+   enum args { classname = 0, ammo_index_1 = 1, max_ammo_1 = 2, ammo_index_2 = 3, max_ammo_2 = 4, slot = 5, slot_pos = 6, id = 7, flags = 8, min = 9 };
 
    // check the minimum states
    if (m_args.length () < min) {
@@ -137,6 +137,8 @@ void MessageDispatcher::netMsgWeaponList () {
    prop.classname = m_args[classname].chars_;
    prop.ammo1 = m_args[ammo_index_1].long_;
    prop.ammo1Max = m_args[max_ammo_1].long_;
+   prop.ammo2 = m_args[ammo_index_2].long_;
+   prop.ammo2Max = m_args[max_ammo_2].long_;
    prop.slot = m_args[slot].long_;
    prop.pos = m_args[slot_pos].long_;
    prop.id = m_args[id].long_;
@@ -333,9 +335,29 @@ void MessageDispatcher::netMsgTeamInfo () {
       return;
    }
    auto &client = util.getClient (m_args[index].long_ - 1);
+   const char *teamName = m_args[team].chars_;
+
+   // half-life teamplay uses custom team names from mp_teamlist
+   if (game.is (GameFlags::HalfLife) && !game.is (GameFlags::FreeForAll)) {
+         if (!m_teamInfoCache.exists (teamName)) {
+            // assign next free team slot (0/1); spectators stay unassigned
+            StringRef teamRef = teamName;
+
+            if (strings.isEmpty (teamName) || teamRef == "spectator" || teamRef == "SPECTATOR") {
+               m_teamInfoCache[teamName] = Team::Spectator;
+            }
+            else {
+               const int assigned = static_cast <int> (m_teamInfoCache.length ()) % kGameTeamNum;
+               m_teamInfoCache[teamName] = assigned;
+            }
+         }
+      client.team2 = m_teamInfoCache[teamName];
+      client.team = client.team2;
+      return;
+   }
 
    // update player team
-   client.team2 = m_teamInfoCache[m_args[team].chars_]; // update real team
+   client.team2 = m_teamInfoCache[teamName]; // update real team
    client.team = game.is (GameFlags::FreeForAll) ? m_args[index].long_ : client.team2;
 }
 

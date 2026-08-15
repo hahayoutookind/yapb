@@ -1105,6 +1105,8 @@ void Bot::handleWeapons (float distance, int, int id, int choosen) {
       // reset burst fire variables
       m_firePause = 0.0f;
       m_timeLastFired = 0.0f;
+      m_hlGaussChargeTime = 0.0f;
+      m_hlGrenadeCookTime = 0.0f;
 
       return;
    }
@@ -1119,6 +1121,12 @@ void Bot::handleWeapons (float distance, int, int id, int choosen) {
          }
          choosen++;
       }
+   }
+
+   // half-life special weapon handling
+   if (game.is (GameFlags::HalfLife)) {
+      handleHLWeapons (distance, id, choosen);
+      return;
    }
 
    // if we're have a glock or famas vary burst fire mode
@@ -1229,6 +1237,244 @@ void Bot::handleWeapons (float distance, int, int id, int choosen) {
    }
 }
 
+void Bot::handleHLWeapons (float distance, int id, int choosen) {
+   const auto tab = conf.getRawWeapons ();
+   const float timeDelta = game.time () - m_frameInterval;
+
+   if (handleHLSpecialWeapon (distance, id)) {
+      return;
+   }
+
+   // crowbar melee
+   if (id == HLWeapon::Crowbar) {
+      if (distance < 72.0f) {
+         pev->button |= IN_ATTACK;
+         m_shootTime = timeDelta;
+      }
+      return;
+   }
+
+   // default primary fire
+   if ((distance < kSprayDistance && !isRecoilHigh ()) || m_blindTime > game.time ()) {
+      if (tab[choosen].primaryFireHold) {
+         pev->button |= IN_ATTACK;
+      }
+      else if ((m_oldButtons & IN_ATTACK) == 0) {
+         pev->button |= IN_ATTACK;
+      }
+
+      if (pev->button & IN_ATTACK) {
+         m_shootTime = timeDelta;
+      }
+   }
+   else {
+      if (needToPauseFiring (distance)) {
+         return;
+      }
+
+      if (tab[choosen].primaryFireHold) {
+         m_shootTime = timeDelta;
+         pev->button |= IN_ATTACK;
+      }
+      else {
+         if ((m_oldButtons & IN_ATTACK) == 0) {
+            pev->button |= IN_ATTACK;
+         }
+         m_shootTime = timeDelta + rg (0.1f, 0.35f);
+      }
+   }
+}
+
+bool Bot::handleHLSpecialWeapon (float distance, int id) {
+   const float timeDelta = game.time () - m_frameInterval;
+   const bool enemyVisible = !game.isNullEntity (m_enemy) && (m_states & Sense::SeeingEnemy);
+
+   switch (id) {
+   case HLWeapon::Shotgun:
+      // double-barrel at close range when we have shells
+      if (distance < 180.0f && getAmmoInClip () >= 2 && enemyVisible) {
+         if ((m_oldButtons & IN_ATTACK2) == 0) {
+            pev->button |= IN_ATTACK2;
+         }
+         m_shootTime = timeDelta + 0.25f;
+         return true;
+      }
+      break;
+
+   case HLWeapon::MP5:
+      // secondary grenade launcher at mid/long range
+      if (distance > 350.0f && distance < 900.0f && getAmmo2 (id) > 0 && enemyVisible && !m_fireHurtsFriend) {
+         if ((m_oldButtons & IN_ATTACK2) == 0) {
+            pev->button |= IN_ATTACK2;
+         }
+         m_shootTime = timeDelta + 0.4f;
+         return true;
+      }
+      break;
+
+   case HLWeapon::Gauss:
+      // cancel charge underwater
+      if (pev->waterlevel >= 3) {
+         m_hlGaussChargeTime = 0.0f;
+         break;
+      }
+
+      // long-range charged shot
+      if (distance > 500.0f && enemyVisible && getAmmo (id) > 5) {
+         if (cr::fzero (m_hlGaussChargeTime)) {
+            m_hlGaussChargeTime = game.time ();
+         }
+
+         // hold secondary to charge
+         pev->button |= IN_ATTACK2;
+
+         // release after ~1s charge
+         if (game.time () - m_hlGaussChargeTime > rg (0.8f, 1.4f)) {
+            pev->button &= ~IN_ATTACK2;
+            m_hlGaussChargeTime = 0.0f;
+            m_shootTime = timeDelta + 0.3f;
+         }
+         return true;
+      }
+
+      // tap primary for light shots
+      m_hlGaussChargeTime = 0.0f;
+      if ((m_oldButtons & IN_ATTACK) == 0) {
+         pev->button |= IN_ATTACK;
+      }
+      m_shootTime = timeDelta + rg (0.15f, 0.3f);
+      return true;
+
+   case HLWeapon::Egon:
+      if (enemyVisible && getAmmo (id) > 0) {
+         pev->button |= IN_ATTACK;
+         m_shootTime = timeDelta;
+         return true;
+      }
+      break;
+
+   case HLWeapon::Crossbow:
+   case HLWeapon::Python:
+      // zoom at long range
+      if (distance > 400.0f && pev->fov >= 90.0f && m_zoomCheckTime < game.time ()) {
+         pev->button |= IN_ATTACK2;
+         m_zoomCheckTime = game.time () + 0.5f;
+         m_shootTime = timeDelta + 0.2f;
+         return true;
+      }
+      if (distance <= 250.0f && pev->fov < 90.0f && m_zoomCheckTime < game.time ()) {
+         pev->button |= IN_ATTACK2;
+         m_zoomCheckTime = game.time () + 0.5f;
+         return true;
+      }
+      break;
+
+   case HLWeapon::RPG:
+      if (enemyVisible && distance > 200.0f && !m_fireHurtsFriend) {
+         // enable laser spot
+         if (!m_hlRpgSpotActive && m_hlRpgSpotCheck < game.time ()) {
+            pev->button |= IN_ATTACK2;
+            m_hlRpgSpotActive = true;
+            m_hlRpgSpotCheck = game.time () + 1.0f;
+            m_shootTime = timeDelta + 0.25f;
+            return true;
+         }
+         if ((m_oldButtons & IN_ATTACK) == 0 && getAmmoInClip () > 0) {
+            pev->button |= IN_ATTACK;
+            m_shootTime = timeDelta + 0.8f;
+            return true;
+         }
+      }
+      else if (m_hlRpgSpotActive && m_hlRpgSpotCheck < game.time ()) {
+         pev->button |= IN_ATTACK2;
+         m_hlRpgSpotActive = false;
+         m_hlRpgSpotCheck = game.time () + 1.0f;
+      }
+      break;
+
+   case HLWeapon::Hornetgun:
+      if (enemyVisible) {
+         if (distance < 300.0f) {
+            pev->button |= IN_ATTACK; // tracking
+         }
+         else {
+            pev->button |= IN_ATTACK2; // spread
+         }
+         m_shootTime = timeDelta;
+         return true;
+      }
+      break;
+
+   case HLWeapon::HandGrenade:
+      if (enemyVisible && distance > 200.0f && distance < 700.0f && !m_fireHurtsFriend) {
+         if (cr::fzero (m_hlGrenadeCookTime)) {
+            m_hlGrenadeCookTime = game.time ();
+            pev->button |= IN_ATTACK;
+            m_isUsingGrenade = true;
+            return true;
+         }
+
+         // keep holding to cook, release after short cook
+         if (game.time () - m_hlGrenadeCookTime < rg (0.6f, 1.2f)) {
+            pev->button |= IN_ATTACK;
+            return true;
+         }
+
+         // release to throw
+         pev->button &= ~IN_ATTACK;
+         m_hlGrenadeCookTime = 0.0f;
+         m_isUsingGrenade = false;
+         m_shootTime = timeDelta + 0.5f;
+         return true;
+      }
+      m_hlGrenadeCookTime = 0.0f;
+      m_isUsingGrenade = false;
+      break;
+
+   case HLWeapon::Satchel:
+      if (m_hlSatchelState == 0) {
+         // place satchel near choke / when enemy not seen closely
+         if ((!enemyVisible || distance > 400.0f) && (m_oldButtons & IN_ATTACK) == 0) {
+            pev->button |= IN_ATTACK;
+            m_hlSatchelState = 1;
+            m_shootTime = timeDelta + 0.5f;
+            return true;
+         }
+      }
+      else {
+         // detonate when enemy near our last position or visible close
+         if (enemyVisible && distance < 350.0f) {
+            pev->button |= IN_ATTACK2;
+            m_hlSatchelState = 0;
+            m_shootTime = timeDelta + 0.4f;
+            return true;
+         }
+      }
+      break;
+
+   case HLWeapon::Tripmine:
+      // place when not in active fight
+      if (!enemyVisible && (m_oldButtons & IN_ATTACK) == 0) {
+         pev->button |= IN_ATTACK;
+         m_shootTime = timeDelta + 0.6f;
+         return true;
+      }
+      break;
+
+   case HLWeapon::Snark:
+      if (enemyVisible && distance < 500.0f && (m_oldButtons & IN_ATTACK) == 0) {
+         pev->button |= IN_ATTACK;
+         m_shootTime = timeDelta + 0.4f;
+         return true;
+      }
+      break;
+
+   default:
+      break;
+   }
+   return false;
+}
+
 void Bot::doFireWeapons () {
    // the bots wants to fire at something?
 
@@ -1241,7 +1487,7 @@ void Bot::fireWeapons () {
    // this function will return true if weapon was fired, false otherwise
 
    // do not handle this if with grenade, as it's done it throw grenade task
-   if (m_isUsingGrenade) {
+   if (m_isUsingGrenade && !game.is (GameFlags::HalfLife)) {
       return;
    }
    const float distance = m_lookAt.distance (getEyesPos ()); // how far away is the enemy?
@@ -1254,7 +1500,7 @@ void Bot::fireWeapons () {
    else {
       m_fireHurtsFriend = false;
    }
-   int selectId = Weapon::Knife, selectIndex = 0, choosenWeapon = 0;
+   int selectId = getMeleeWeaponId (), selectIndex = 0, choosenWeapon = 0;
 
    const auto tab = conf.getRawWeapons ();
    const auto weapons = pev->weapons;
@@ -1285,9 +1531,12 @@ void Bot::fireWeapons () {
 
       // is the bot carrying this weapon?
       if (weapons & cr::bit (wid)) {
+         const bool hasClipAmmo = tab[selectIndex].maxClip < 0
+            ? (tab[selectIndex].type == WeaponType::Melee || getAmmo (wid) != 0)
+            : (m_ammoInClip[wid] > 0);
 
          // is enough ammo available to fire AND check is better to use pistol in our current situation...
-         if (m_ammoInClip[wid] > 0 && !isWeaponBadAtDistance (selectIndex, distance)) {
+         if (hasClipAmmo && !isWeaponBadAtDistance (selectIndex, distance)) {
             const auto &prop = conf.getWeaponProp (wid);
 
             // skip the weapons that cannot be used underwater (regamedll addition)
@@ -1326,7 +1575,7 @@ void Bot::fireWeapons () {
          }
          selectIndex++;
       }
-      selectId = Weapon::Knife; // no available ammo, use knife!
+      selectId = getMeleeWeaponId (); // no available ammo, use melee!
    }
    handleWeapons (distance, selectIndex, selectId, choosenWeapon);
 }
@@ -1696,12 +1945,18 @@ void Bot::attackMovement () {
 bool Bot::hasPrimaryWeapon () const {
    // this function returns returns true, if bot has a primary weapon
 
+   if (game.is (GameFlags::HalfLife)) {
+      return (pev->weapons & kHLCombatWeaponMask) != 0;
+   }
    return (pev->weapons & kPrimaryWeaponMask) != 0;
 }
 
 bool Bot::hasSecondaryWeapon () const {
    // this function returns returns true, if bot has a secondary weapon
 
+   if (game.is (GameFlags::HalfLife)) {
+      return (pev->weapons & (cr::bit (HLWeapon::Glock) | cr::bit (HLWeapon::Python))) != 0;
+   }
    return (pev->weapons & kSecondaryWeaponMask) != 0;
 }
 
@@ -1751,7 +2006,7 @@ int Bot::bestPrimaryCarried () {
       weapons |= cr::bit (Weapon::Shield);
    }
 
-   for (int i = 0; i < kNumWeapons; ++i) {
+   for (int i = 0; i < getNumWeapons (); ++i) {
       if (weapons & cr::bit (tab[*pref].id)) {
          weaponIndex = i;
       }
@@ -1774,7 +2029,7 @@ int Bot::bestSecondaryCarried () {
    }
    const auto tab = conf.getRawWeapons ();
 
-   for (int i = 0; i < kNumWeapons; ++i) {
+   for (int i = 0; i < getNumWeapons (); ++i) {
       const int id = tab[*pref].id;
 
       if ((weapons & cr::bit (id)) && conf.getWeaponType (id) == WeaponType::Pistol) {
@@ -1808,7 +2063,7 @@ bool Bot::rateGroundWeapon (edict_t *ent) {
    const int *pref = conf.getWeaponPrefs (m_personality);
    const auto tab = conf.getRawWeapons ();
 
-   for (int i = 0; i < kNumWeapons; ++i) {
+   for (int i = 0; i < getNumWeapons (); ++i) {
       if (ent->v.model.str (9) == tab[*pref].model) {
          groundIndex = i;
          break;
@@ -1827,6 +2082,9 @@ bool Bot::rateGroundWeapon (edict_t *ent) {
 }
 
 bool Bot::hasAnyWeapons () const {
+   if (game.is (GameFlags::HalfLife)) {
+      return (pev->weapons & kHLCombatWeaponMask) != 0;
+   }
    return !!(pev->weapons & (kPrimaryWeaponMask | kSecondaryWeaponMask));
 }
 
@@ -1873,7 +2131,7 @@ void Bot::selectBestWeapon () {
 
    // if knife mode activated, force bot to use knife
    if (isKnifeMode ()) {
-      selectWeaponById (Weapon::Knife);
+      selectWeaponById (getMeleeWeaponId ());
       return;
    }
 
@@ -1881,6 +2139,7 @@ void Bot::selectBestWeapon () {
       return;
    }
    const auto tab = conf.getRawWeapons ();
+   const int numWeapons = getNumWeapons ();
 
    int selectIndex = 0;
    int chosenWeaponIndex = 0;
@@ -1894,8 +2153,21 @@ void Bot::selectBestWeapon () {
          continue;
       }
 
+      // skip deployables for general combat selection on half-life (handled specially)
+      if (game.is (GameFlags::HalfLife) && tab[selectIndex].type == WeaponType::Deployable) {
+         ++selectIndex;
+         continue;
+      }
+
       const int id = tab[selectIndex].id;
       bool ammoLeft = false;
+
+      // noclip weapons (gauss/egon/crowbar) always usable if owned
+      if (tab[selectIndex].maxClip < 0) {
+         if (tab[selectIndex].type == WeaponType::Melee || getAmmo (id) > 0 || getAmmo (id) < 0) {
+            ammoLeft = true;
+         }
+      }
 
       // is the bot already holding this weapon and there is still ammo in clip?
       if (tab[selectIndex].id == m_currentWeapon && (getAmmoInClip () < 0 || getAmmoInClip () >= tab[selectIndex].minPrimaryAmmo)) {
@@ -1913,7 +2185,7 @@ void Bot::selectBestWeapon () {
       ++selectIndex;
    }
 
-   chosenWeaponIndex %= kNumWeapons + 1;
+   chosenWeaponIndex %= numWeapons + 1;
    selectIndex = chosenWeaponIndex;
 
    const int id = tab[selectIndex].id;
@@ -1924,6 +2196,10 @@ void Bot::selectBestWeapon () {
    }
    m_isReloading = false;
    m_reloadState = Reload::None;
+
+   // cancel hl charge/cook states on weapon switch
+   m_hlGaussChargeTime = 0.0f;
+   m_hlGrenadeCookTime = 0.0f;
 }
 
 void Bot::selectSecondary () {
@@ -2615,6 +2891,34 @@ int Bot::getAmmo (int id) const {
       return -1;
    }
    return m_ammo[prop.ammo1];
+}
+
+int Bot::getAmmo2 (int id) const {
+   const auto &prop = conf.getWeaponProp (id);
+
+   if (prop.ammo2 < 0 || prop.ammo2 > kMaxWeapons - 1) {
+      return 0;
+   }
+   return m_ammo[prop.ammo2];
+}
+
+int Bot::getMeleeWeaponId () const {
+   if (game.is (GameFlags::HalfLife)) {
+      return static_cast <int> (HLWeapon::Crowbar);
+   }
+   return static_cast <int> (Weapon::Knife);
+}
+
+int Bot::getNumWeapons () const {
+   return conf.getWeaponCount ();
+}
+
+bool Bot::canCamp () const {
+   if (game.is (GameFlags::HalfLife) || game.is (GameFlags::CSDM)) {
+      return false;
+   }
+//   return cv_camping_allowed.as <bool> ();
+   return false;
 }
 
 void Bot::selectWeaponByIndex (int index) {
