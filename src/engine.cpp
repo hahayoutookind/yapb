@@ -402,7 +402,7 @@ void Game::setPlayerStartDrawModels () {
       { "info_player_deathmatch", "models/player/terror/terror.mdl" },
       { "info_vip_start", "models/player/vip/vip.mdl" }
    };
-   static HLHashMap <String, String> hlmodels {
+   static HashMap <String, String> hlmodels {
       { "info_player_start", "models/player.mdl" },
       { "info_player_deathmatch", "models/player/gordon/gordon.mdl" }
    };
@@ -412,14 +412,16 @@ void Game::setPlayerStartDrawModels () {
            searchEntities ("classname", pair.first, [&] (edict_t *ent) {
               m_engineWrap.setModel (ent, pair.second.chars ());
               return EntitySearchResult::Continue;
-      });
+           });
+       }
    }
    else {
       for (const auto &pair : models) {
           searchEntities ("classname", pair.first, [&] (edict_t *ent) {
              m_engineWrap.setModel (ent, pair.second.chars ());
              return EntitySearchResult::Continue;
-      });
+          });
+      }
    }
 }
 
