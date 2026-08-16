@@ -150,6 +150,79 @@ void BotManager::forEach (ForEachBot handler) {
    }
 }
 
+String Bot::HLpickPlayerModel (StringRef botName) {
+   // scans folder names from models/player/ and then
+   // picks one of them and uses it for "model" cvar
+
+   FileEnumerator enumerator { "models/players/*" };
+   StringArray models {};
+
+   while (enumerator) {
+      const auto path = enumerator.getMatch ();
+      const auto folder = path.substr (path.findLastOf (kPathSeparator) + 1);
+
+      if (!folder.empty () && folder != "." && folder != "..") {
+         const auto modelFile =
+            strings.joinPath (
+               "models/players",
+               folder,
+               strings.format ("%s.mdl", folder)
+            );
+
+         if (plat.fileExists (modelFile.chars ())) {
+            models.emplace (folder);
+         }
+      }
+
+      enumerator.next ();
+   }
+
+   if (models.empty ()) {
+      return {};
+   }
+
+   // deterministic selection based on bot name
+   // same name always gets same model
+   const auto botHash = botName.hash ();
+
+   size_t bestIndex = 0;
+   uint32_t bestScore = 0xffffffffu;
+
+   for (size_t i = 0; i < models.length (); ++i) {
+      const auto modelHash = models[i].hash ();
+      const auto score = modelHash ^ botHash;
+
+      if (score < bestScore) {
+         bestScore = score;
+         bestIndex = i;
+      }
+   }
+
+   return models[bestIndex].str ();
+}
+
+void Bot::HLsetupAppearance (edict_t *bot, char *buffer) {
+   const StringRef name = bot->v.netname.str ();
+   const auto hash = name.hash ();
+
+   //same as HLpickPlayerModel, same name gets
+   //same colors
+   const auto topColor = hash & 0xffu;
+   const auto bottomColor = (hash >> 8) & 0xffu;
+
+   const auto clientIndex = game.indexOfEntity (bot);
+
+   engfuncs.pfnSetClientKeyValue ( clientIndex, buffer, "topcolor", strings.format ("%u", topColor) );
+
+   engfuncs.pfnSetClientKeyValue ( clientIndex, buffer, "bottomcolor", strings.format ("%u", bottomColor) );
+
+   const auto model = HLpickPlayerModel (name);
+
+   if (!model.empty ()) {
+      engfuncs.pfnSetClientKeyValue ( clientIndex, buffer, "model", model.chars () );
+   }
+}
+
 BotCreateResult BotManager::create (StringRef name, int difficulty, int personality, int team, int skin) {
    // this function completely prepares bot entity (edict) for creation, creates team, difficulty, sets named etc, and
    // then sends result to bot constructor
@@ -1162,7 +1235,10 @@ Bot::Bot (edict_t *bot, int difficulty, int personality, int team, int skin) {
    engfuncs.pfnSetClientKeyValue (clientIndex, buffer, "_vgui_menus", "0");
    engfuncs.pfnSetClientKeyValue (clientIndex, buffer, "_ah", "0");
 
-   if (!game.is (GameFlags::Legacy)) {
+   if (game.is (GameFlags::HalfLife)) {
+      HLsetupAppearance(bot, buffer);
+   }
+   else if (!game.is (GameFlags::Legacy)) {
       if (cv_show_latency.as <int> () == 1) {
          engfuncs.pfnSetClientKeyValue (clientIndex, buffer, "*bot", "1");
       }

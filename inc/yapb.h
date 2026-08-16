@@ -595,6 +595,9 @@ private:
 
    uint8_t computeMsec () const;
 
+   String HLpickPlayerModel (StringRef botName);
+   void HLsetupAppearance (edict_t *bot, char *buffer);
+
 private:
    bool isOnLadder () const {
       return pev->movetype == MOVETYPE_FLY;
