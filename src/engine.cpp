@@ -1422,7 +1422,7 @@ void Game::printBotVersion () const {
       ctrl.msg ("\n%s v%s successfully loaded for game: Counter-Strike %s.\n\tFlags: %s.\n", product.name, product.version, gameVersionStr, botRuntimeFlags.empty () ? "None" : String::join (botRuntimeFlags, ", "));
    }
    else {
-      ctrl.msg ("\n%s v%s successfully loaded for game: Half-Life %s.\n\tFlags: %s.\n", product.name, product.version, botRuntimeFlags.empty () ? "None" : String::join (botRuntimeFlags, ", "));
+      ctrl.msg ("\n%s v%s successfully loaded for game: Half-Life \n\tFlags: %s.\n", product.name, product.version, botRuntimeFlags.empty () ? "None" : String::join (botRuntimeFlags, ", "));
    }
 }
 
