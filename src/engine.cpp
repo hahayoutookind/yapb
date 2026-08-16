@@ -1418,7 +1418,7 @@ void Game::printBotVersion () const {
       }
       botRuntimeFlags.push (strings.format ("SIMD: %s", String::join (simdLevels, " & ")));
    }
-   if(game.is (GameFlags::HalfLife) {
+   if(game.is (GameFlags::HalfLife)) {
       ctrl.msg ("\n%s v%s successfully loaded for game: Counter-Strike %s.\n\tFlags: %s.\n", product.name, product.version, gameVersionStr, botRuntimeFlags.empty () ? "None" : String::join (botRuntimeFlags, ", "));
    }
    else {
