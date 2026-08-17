@@ -154,51 +154,27 @@ String Bot::HLpickPlayerModel (StringRef botName) {
    // scans folder names from models/player/ and then
    // picks one of them and uses it for "model" cvar
 
-   FileEnumerator enumerator { "models/player/" };
-   StringArray models {};
-
-   while (enumerator) {
-      const auto path = enumerator.getMatch ();
-      const auto folder = path.substr (path.findLastOf (kPathSeparator) + 1);
-
-      if (!folder.empty () && folder != "." && folder != "..") {
-         const auto modelFile =
-            strings.joinPath (
-               "models/player",
-               folder,
-               strings.format ("%s.mdl", folder)
-            );
-
-         if (plat.fileExists (modelFile.chars ())) {
-            models.emplace (folder);
-         }
-      }
-
-      enumerator.next ();
-   }
-
-   if (models.empty ()) {
-      return {};
-   }
+   static constexpr StringRef pmodels[] = {
+      "gordon",
+      "barney",
+      "scientist",
+      "hgrunt",
+      "helmet",
+      "gina",
+      "skeleton",
+      "ivan",
+      "recon",
+      "robo",
+      "bbbbarney",
+      "tmcm",
+      "zombie"
+   };
 
    // deterministic selection based on bot name
    // same name always gets same model
    const auto botHash = botName.hash ();
 
-   size_t bestIndex = 0;
-   uint32_t bestScore = 0xffffffffu;
-
-   for (size_t i = 0; i < models.length (); ++i) {
-      const auto modelHash = models[i].hash ();
-      const auto score = modelHash ^ botHash;
-
-      if (score < bestScore) {
-         bestScore = score;
-         bestIndex = i;
-      }
-   }
-
-   return models[bestIndex].str ();
+   return pmodels[hash % std::size (pmodels)].str ();
 }
 
 void Bot::HLsetupAppearance (edict_t *bot, char *buffer) {
