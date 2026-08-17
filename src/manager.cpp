@@ -151,9 +151,6 @@ void BotManager::forEach (ForEachBot handler) {
 }
 
 String Bot::HLpickPlayerModel (StringRef botName) {
-   // scans folder names from models/player/ and then
-   // picks one of them and uses it for "model" cvar
-
    static constexpr StringRef pmodels[] = {
       "gordon",
       "barney",
@@ -170,11 +167,10 @@ String Bot::HLpickPlayerModel (StringRef botName) {
       "zombie"
    };
 
-   // deterministic selection based on bot name
-   // same name always gets same model
-   const auto botHash = botName.hash ();
+   const auto botHash = static_cast <size_t> (botName.hash ());
+   constexpr size_t modelCount = sizeof (pmodels) / sizeof (pmodels[0]);
 
-   return pmodels[hash % std::size (pmodels)].str ();
+   return pmodels[botHash % modelCount].str ();
 }
 
 void Bot::HLsetupAppearance (edict_t *bot, char *buffer) {
