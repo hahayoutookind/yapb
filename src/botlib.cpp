@@ -464,7 +464,7 @@ void Bot::updatePickups () {
             pickupType = Pickup::DroppedC4;
          }
          else if (game.is (GameFlags::HalfLife)
-            && (classname.startsWith ("weapon_") || classname.startsWith ("ammo_")
+            && (classname.startsWith ("weapon_") || classname.startsWith ("ammo_") || classname.startsWith ("weaponbox")
                || classname.startsWith ("item_healthkit") || classname.startsWith ("item_battery")
                || classname.startsWith ("item_longjump") || isWeaponBox)
             && !m_isUsingGrenade) {
