@@ -170,7 +170,7 @@ String Bot::HLpickPlayerModel (StringRef botName) {
    const auto botHash = static_cast <size_t> (botName.hash ());
    constexpr size_t modelCount = sizeof (pmodels) / sizeof (pmodels[0]);
 
-   return pmodels[botHash % modelCount].str ();
+   return String { pmodels[botHash % modelCount] };
 }
 
 void Bot::HLsetupAppearance (edict_t *bot, char *buffer) {
