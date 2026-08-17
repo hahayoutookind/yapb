@@ -154,7 +154,7 @@ String Bot::HLpickPlayerModel (StringRef botName) {
    // scans folder names from models/player/ and then
    // picks one of them and uses it for "model" cvar
 
-   FileEnumerator enumerator { "models/players/*" };
+   FileEnumerator enumerator { "models/player/*" };
    StringArray models {};
 
    while (enumerator) {
@@ -164,7 +164,7 @@ String Bot::HLpickPlayerModel (StringRef botName) {
       if (!folder.empty () && folder != "." && folder != "..") {
          const auto modelFile =
             strings.joinPath (
-               "models/players",
+               "models/player",
                folder,
                strings.format ("%s.mdl", folder)
             );
