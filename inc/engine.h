@@ -252,6 +252,7 @@ public:
    bool loadCSBinary ();
 
    void constructCSBinaryName (StringArray &libs);
+   void constructHLBinaryName (StringArray &libs);
 
    // do post-load stuff
    bool postload ();

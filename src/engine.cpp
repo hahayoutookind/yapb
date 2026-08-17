@@ -873,37 +873,82 @@ void Game::constructCSBinaryName (StringArray &libs) {
    }
    // else: suffix remains empty (e.g., x86 linux/windows/macos)
 
-   const bool isHalfLifeMod = StringRef(getRunningModName()) == "valve" || is(GameFlags::HalfLife);
-
    // build base names
    if (plat.android) {
-      if (isHalfLifeMod) {
-         libs.push ("libhl" + suffix);
-      }
+      // only "libcs" with suffix (no "mp", and must have "lib" prefix)
       libs.push ("libcs" + suffix);
-   }
-   else if (isHalfLifeMod) {
-      libs.push ("hl" + suffix);
-      libs.push ("cs" + suffix);
-      libs.push ("mp" + suffix);
    }
    else {
       // Standard: "mp" and "cs" with suffix
       libs.push ("cs" + suffix);
       libs.push ("mp" + suffix);
+   }
+}
+
+void Game::constructHLBinaryName (StringArray &libs) {
+   String suffix {};
+
+   if (plat.android) {
+      suffix = "_android";
+      if (plat.x64) {
+         suffix += "_arm64";
+      }
+      else if (plat.arm) {
+         suffix += "_armv7l";
+      }
+   }
+   else if (plat.psvita) {
+      suffix = "_psvita";
+   }
+   else if (plat.x64) {
+      if (plat.arm) {
+         suffix = "_arm64";
+      }
+      else if (plat.ppc) {
+         suffix = "_ppc64le";
+      }
+      else if (plat.riscv) {
+         suffix = "_riscv64d";
+      }
+      else {
+         suffix = "_amd64";
+      }
+   }
+   else if (plat.arm) {
+      // non-android arm32
+      suffix = "_armv7hf";
+   }
+   else if (!plat.nix && !plat.win && !plat.macos) {
+      // fallback for unknown 32-bit x86 (e.g., legacy linux/bsd)
+      suffix = "_i386";
+   }
+   // else: suffix remains empty (e.g., x86 linux/windows/macos)
+
+   // build base names
+   if (plat.android) {
+      libs.push ("libhl" + suffix);
+   }
+   else {
+      // Standard: "mp" and "cs" with suffix
       libs.push ("hl" + suffix);
    }
 }
 
 bool Game::loadCSBinary () {
    StringRef modname = getRunningModName ();
+   const bool isHalfLifeMod = StringRef(getRunningModName()) == "valve" || is(GameFlags::HalfLife);
 
    if (modname.empty ()) {
       return false;
    }
 
    StringArray libs {};
-   constructCSBinaryName (libs);
+   if(isHalfLifeMod) {
+      constructHLBinaryName (libs);
+   }
+   else {
+      constructCSBinaryName (libs);
+   }
 
    auto libCheck = [&] (StringRef mod, StringRef dll) {
       // try to load gamedll
