@@ -3251,13 +3251,6 @@ void Bot::update () {
          issueCommand ("votemap %d", m_voteMap);
          m_voteMap = 0;
       }
-      if (game.is (GameFlags::HalfLife)) {
-         // this should fix the issue with respawn on HL servers with mp_forcerespawn
-         // set to 0. mp_forcerespawn 0 requires player to press any button.
-         // but bots do not issue any button when they're dead.
-         // this should fix the issue
-         pev->button |= IN_ATTACK;
-      }
    }
    else if ((m_buyingFinished
       && !(pev->maxspeed < 10.0f && tid != Task::PlantBomb && tid != Task::DefuseBomb)
@@ -3278,6 +3271,18 @@ void Bot::update () {
    else if (!m_botMovement) {
       resetMovement ();
    }
+
+   if (!m_isAlive && game.is (GameFlags::HalfLife)) {
+         // this should fix the issue with respawn on HL
+         // servers with mp_forcerespawn set to 0.
+         // mp_forcerespawn 0 requires player to press
+         // any button. but bots do not issue any button
+         // when they're dead.
+      if (pev->deadflag == DEAD_RESPAWNABLE) {
+         pev->button |= IN_ATTACK;
+      }
+   }
+
    runMovement ();
 }
 
