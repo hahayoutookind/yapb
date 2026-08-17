@@ -3011,7 +3011,7 @@ int Bot::selectHLCombatWeapon (float distance) const {
    if (hasUsable (HLWeapon::Egon)) {
       return HLWeapon::Egon;
    }
-   if (hasUsable (HLWeapon::Gauss)) {
+   if (getAmmo (HLWeapon::Gauss) >= 2 && hasUsable (HLWeapon::Gauss)) {
       return HLWeapon::Gauss;
    }
    if (distance < 180.0f && hasUsable (HLWeapon::Shotgun)) {
