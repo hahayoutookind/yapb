@@ -936,19 +936,13 @@ void Game::constructHLBinaryName (StringArray &libs) {
 
 bool Game::loadCSBinary () {
    StringRef modname = getRunningModName ();
-   const bool isHalfLifeMod = StringRef(getRunningModName()) == "valve" || is(GameFlags::HalfLife);
 
    if (modname.empty ()) {
       return false;
    }
 
    StringArray libs {};
-   if(isHalfLifeMod) {
-      constructHLBinaryName (libs);
-   }
-   else {
-      constructCSBinaryName (libs);
-   }
+   constructHLBinaryName (libs);
 
    auto libCheck = [&] (StringRef mod, StringRef dll) {
       // try to load gamedll
