@@ -154,7 +154,7 @@ String Bot::HLpickPlayerModel (StringRef botName) {
    // scans folder names from models/player/ and then
    // picks one of them and uses it for "model" cvar
 
-   FileEnumerator enumerator { "models/player/*" };
+   FileEnumerator enumerator { "models/player/" };
    StringArray models {};
 
    while (enumerator) {
