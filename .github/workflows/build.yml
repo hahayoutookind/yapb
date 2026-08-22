@@ -135,6 +135,48 @@ jobs:
           name: ${{matrix.arch}}
           path: |
             ${{matrix.arch}}/yapb*.dylib
+
+  bot-android:
+    env:
+      name: android
+
+    strategy:
+      matrix:
+        abi: ['arm64-v8a', 'armeabi-v7a', 'x86']
+      fail-fast: false
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+      - name: Setup Android NDK
+        id: setup-ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27d
+          add-to-path: false
+      - name: Configure CMake
+        shell: bash
+        run: |
+          cmake -B build-${{matrix.abi}} -S . \
+            -DCMAKE_TOOLCHAIN_FILE=${{steps.setup-ndk.outputs.ndk-path}}/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=${{matrix.abi}} \
+            -DANDROID_PLATFORM=android-21 \
+            -DCMAKE_BUILD_TYPE=Release
+      - name: Build sources
+        shell: bash
+        run: |
+          cmake --build build-${{matrix.abi}} --config Release --parallel
+          echo "artifcat=`find build-${{matrix.abi}} -maxdepth 1 -name '*yapb*.so'`" >> $GITHUB_ENV
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-${{matrix.abi}}
+          path: ${{env.artifcat}}
             
   bot-continuous-release:
     if: github.event_name == 'push'
