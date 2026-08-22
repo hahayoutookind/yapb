@@ -282,6 +282,7 @@ void Bot::normal_ () {
    const float shiftSpeed = getShiftSpeed ();
 
    if ((!cr::fzero (m_moveSpeed) && m_moveSpeed > shiftSpeed) && (cv_walking_allowed && mp_footsteps)
+      && !game.is (GameFlags::HalfLife)
       && m_difficulty >= Difficulty::Normal
       && (m_heardSoundTime + 6.0f >= game.time () || (m_states & Sense::HearingEnemy))
       && numEnemiesNear (pev->origin, 768.0f) >= 1
@@ -405,7 +406,7 @@ void Bot::huntEnemy_ () {
    }
 
    // bots skill higher than 60?
-   if (cv_walking_allowed && mp_footsteps && m_difficulty >= Difficulty::Normal) {
+   if (cv_walking_allowed && mp_footsteps && !game.is (GameFlags::HalfLife) && m_difficulty >= Difficulty::Normal) {
 
       // then make him move slow if near enemy
       if (m_currentNodeIndex != kInvalidNodeIndex && !(m_currentTravelFlags & PathFlag::Jump)) {
@@ -1112,7 +1113,7 @@ void Bot::followUser_ () {
    }
    m_aimFlags |= AimFlags::Nav;
 
-   if (cv_walking_allowed && m_targetEntity->v.maxspeed < m_moveSpeed && !isKnifeMode ()) {
+   if (cv_walking_allowed && !game.is (GameFlags::HalfLife) && m_targetEntity->v.maxspeed < m_moveSpeed && !isKnifeMode ()) {
       m_moveSpeed = getShiftSpeed ();
    }
 

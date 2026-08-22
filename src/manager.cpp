@@ -1428,7 +1428,10 @@ bool BotManager::isTeamStacked (int team) {
    int teamCount[kGameTeamNum] = { 0, };
 
    for (const auto &client : util.getClients ()) {
-      if ((client.flags & ClientFlags::Used) && client.team2 != Team::Unassigned && client.team2 != Team::Spectator) {
+      // only count real T/CT-slot teams here; with half-life teamplay there can be
+      // more distinct teams than kGameTeamNum, and client.team2 must never be used
+      // to index teamCount[] unless it's known to be in range
+      if ((client.flags & ClientFlags::Used) && isBotTeam (client.team2)) {
          ++teamCount[client.team2];
       }
    }

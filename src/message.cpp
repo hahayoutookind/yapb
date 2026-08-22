@@ -339,18 +339,25 @@ void MessageDispatcher::netMsgTeamInfo () {
 
    // half-life teamplay uses custom team names from mp_teamlist
    if (game.is (GameFlags::HalfLife) && !game.is (GameFlags::FreeForAll)) {
-         if (!m_teamInfoCache.exists (teamName)) {
-            // assign next free team slot (0/1); spectators stay unassigned
-            StringRef teamRef = teamName;
+      if (!m_teamInfoCache.exists (teamName)) {
+         StringRef teamRef = teamName;
 
-            if (strings.isEmpty (teamName) || teamRef == "spectator" || teamRef == "SPECTATOR") {
-               m_teamInfoCache[teamName] = Team::Spectator;
-            }
-            else {
-               const int assigned = static_cast <int> (m_teamInfoCache.length ()) % kGameTeamNum;
-               m_teamInfoCache[teamName] = assigned;
-            }
+         if (strings.isEmpty (teamName) || teamRef == "spectator" || teamRef == "SPECTATOR") {
+            m_teamInfoCache[teamName] = Team::Spectator;
          }
+         else {
+            // give every distinct team name (mp_teamlist) its own unique id instead of
+            // wrapping modulo kGameTeamNum, which aliased the 3rd/4th+ team onto team
+            // 0 or 1 and made unrelated teams see each other as friendly
+            int assigned = m_hlTeamCount++;
+
+            // keep ids clear of the reserved Spectator (2) / Unassigned (3) values
+            if (assigned >= Team::Spectator) {
+               assigned += 2;
+            }
+            m_teamInfoCache[teamName] = assigned;
+         }
+      }
       client.team2 = m_teamInfoCache[teamName];
       client.team = client.team2;
       return;

@@ -91,6 +91,7 @@ private:
    HashMap <String, int32_t> m_showMenuCache {}; // cache for the showmenu message
    HashMap <String, int32_t> m_statusIconCache {}; // cache for status icon message
    HashMap <String, int32_t> m_teamInfoCache {}; // cache for teaminfo message
+   int32_t m_hlTeamCount {}; // number of distinct half-life teamplay teams seen so far
 
 private:
    Bot *m_bot {}; // owner of a message
